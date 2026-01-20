@@ -1,68 +1,61 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using System.Collections;
+
 public class ThirdPersonCamera : MonoBehaviour
 {
     [Header("References")]
-    public Transform player;          // Player transform
-    public Transform cameraRoot;      // Usually the Main Camera transform (this object)
+    public Transform player;
+    public Transform cameraRoot;
 
     [Header("Camera Settings")]
     public Vector3 offset = new Vector3(0f, 1.8f, -3.5f);
-    public float followSpeed = 12f;
-    public float lookSpeed = 1.5f;     // mouse sensitivity multiplier
-    public float pitchMin = -30f;
-    public float pitchMax = 60f;
+    public float lookSpeed = 1.5f;
+    public float autoCenterSpeed = 2f;
+    public float lookInputDeadzone = 0.02f;
 
     [Header("Input")]
-    public InputActionReference lookAction; // Vector2 (mouse delta)
+    public InputActionReference lookAction;
 
-    float yaw = 0f;
-    float pitch = 10f;
+    float yaw;
+    float fixedPitch = 12f;
 
-    void OnEnable()
-    {
-        if (lookAction != null) lookAction.action.Enable();
-    }
-    void OnDisable()
-    {
-        if (lookAction != null) lookAction.action.Disable();
-    }
+    void OnEnable() => lookAction?.action.Enable();
+    void OnDisable() => lookAction?.action.Disable();
 
     void Start()
     {
-        if (cameraRoot == null)
-            cameraRoot = transform;
-
+        if (cameraRoot == null) cameraRoot = transform;
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
-
-        Vector3 e = cameraRoot.eulerAngles;
-        yaw = e.y;
-        pitch = e.x;
+        yaw = cameraRoot.eulerAngles.y;
     }
 
     void LateUpdate()
     {
-        if (player == null || cameraRoot == null) return;
+        if (player == null) return;
 
-        Vector2 look = Vector2.zero;
-        if (lookAction != null)
-            look = lookAction.action.ReadValue<Vector2>();
+        Vector2 look = lookAction != null ? lookAction.action.ReadValue<Vector2>() : Vector2.zero;
 
-        yaw += look.x * lookSpeed * Time.deltaTime * 120f;
-        pitch -= look.y * lookSpeed * Time.deltaTime * 120f;
-        pitch = Mathf.Clamp(pitch, pitchMin, pitchMax);
+        if (Mathf.Abs(look.x) > lookInputDeadzone)
+        {
+            yaw += look.x * lookSpeed * Time.deltaTime * 120f;
+        }
+        else
+        {
+            Rigidbody rb = player.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                Vector3 vel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+                if (vel.sqrMagnitude > 0.01f)
+                {
+                    float targetYaw = Mathf.Atan2(vel.x, vel.z) * Mathf.Rad2Deg;
+                    yaw = Mathf.LerpAngle(yaw, targetYaw, autoCenterSpeed * Time.deltaTime);
+                }
+            }
+        }
 
-        Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
-        Vector3 desiredPosition = player.position + rotation * offset;
-
-        cameraRoot.position = Vector3.Lerp(
-            cameraRoot.position,
-            desiredPosition,
-            1f - Mathf.Exp(-followSpeed * Time.deltaTime)
-        );
-
-        cameraRoot.rotation = rotation;
+        Quaternion rot = Quaternion.Euler(fixedPitch, yaw, 0f);
+        cameraRoot.position = player.position + rot * offset;
+        cameraRoot.rotation = rot;
     }
 }

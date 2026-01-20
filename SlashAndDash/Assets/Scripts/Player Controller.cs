@@ -1,175 +1,184 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using System.Collections;
 
-public class PlayerController : MonoBehaviour
+[RequireComponent(typeof(Rigidbody))]
+public class CarController : MonoBehaviour
 {
-    [Header("Movement")]
-    public float acceleration = 10f;      // How fast we correct velocity toward the desired velocity
-    public float maxVelocity = 6f;        // Base maximum horizontal speed
-    public float weight = 1.5f;           // Higher = harder to change direction (like car weight)
+    [Header("Car Movement Settings")]
+    public float accelerationForce = 2000f;
+    public float maxSpeed = 25f;
+    public float turnSpeed = 150f;           // Degrees per second
+    public float driftFactorMin = 0.7f;      // More drift on sharp turns
+    public float driftFactorMax = 0.98f;     // Less drift when going straight
+    public float driftSpeedMultiplier = 0.8f; // Slow down while drifting
 
-    [Header("Jump")]
-    public float jumpForce = 5f;          // Instant vertical velocity set when jumping
-    public float groundCheckDistance = 0.15f;
-    public LayerMask groundMask;
+    [Header("Drift Boost Settings")]
+    public float driftBoostAmount = 15f;     // Extra speed during boost
+    public float driftBoostDuration = 1f;    // Duration of boost in seconds
 
-    [Header("Drift / Boost")]
-    [Tooltip("Factor applied to maxVelocity while drifting (ex: 0.6 means you are slower during the drift)")]
-    public float driftSlowFactor = 0.6f;
-    [Tooltip("How fast boost builds up while drifting (units per second)")]
-    public float driftBuildRate = 1f;
-    [Tooltip("Maximum extra speed (in world units per second) that can be added by drift boost")]
-    public float driftMaxBoost = 3f;
-    [Tooltip("How long the temporary drift boost lasts (seconds)")]
-    public float driftBoostDuration = 1.5f;
+    [Header("Jump Settings")]
+    public float jumpForce = 10f;            // Upward velocity applied
+    public float groundCheckDistance = 0.2f; // Distance for ground raycast
+    public LayerMask groundLayer;            // Layers considered as ground
 
-    [Header("References")]
-    public Transform cameraTransform;    // Use camera forward/right for movement basis
+    [Header("Debug Settings")]
+    public bool showDebug = true;
 
-    [Header("Input (assign via Input Actions or PlayerInput)")]
-    public InputActionReference moveAction;   // Vector2
-    public InputActionReference lookAction;   // Vector2 (optional for orientation)
-    public InputActionReference jumpAction;   // Button
-    public InputActionReference driftAction;  // Button
+    private Rigidbody rb;
+    private Vector2 moveInput;
+    private PlayerInputActions controls;
 
-    // runtime
-    Rigidbody rb;
-    Vector2 moveInput;
-    bool jumpPressed;
-    bool driftHeld;
-    float driftCharge = 0f;      // current stored boost
-    bool boosting = false;
-    float boostRemaining = 0f;
-    float activeBoostAmount = 0f;
+    private bool isDrifting = false;
+    private bool boostActive = false;
+    private float boostTimer = 0f;
 
-    void Awake()
+    private string debugText = "";
+
+    private void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        if (rb == null) rb = gameObject.AddComponent<Rigidbody>();
-        rb.freezeRotation = true; // let physics handle position but not rotate the capsule
+        rb.linearDamping = 0.5f;
+        rb.angularDamping = 0.5f;
+        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+
+        // Initialize input
+        controls = new PlayerInputActions();
+        controls.Player.Move.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
+        controls.Player.Move.canceled += ctx => moveInput = Vector2.zero;
+        controls.Player.Jump.performed += ctx => Jump();
     }
 
-    void OnEnable()
+    private void OnEnable() => controls.Player.Enable();
+    private void OnDisable() => controls.Player.Disable();
+
+    private void FixedUpdate()
     {
-        if (moveAction != null) moveAction.action.Enable();
-        if (jumpAction != null) jumpAction.action.Enable();
-        if (driftAction != null) driftAction.action.Enable();
-        if (lookAction != null) lookAction.action.Enable();
-    }
-    void OnDisable()
-    {
-        if (moveAction != null) moveAction.action.Disable();
-        if (jumpAction != null) jumpAction.action.Disable();
-        if (driftAction != null) driftAction.action.Disable();
-        if (lookAction != null) lookAction.action.Disable();
+        HandleAcceleration();
+        HandleSteering();
+        ApplyDrift();
+        HandleBoost();
+        UpdateDebugText();
     }
 
-    void Update()
+    private void HandleAcceleration()
     {
-        if (moveAction != null)
-            moveInput = moveAction.action.ReadValue<Vector2>();
-        else
-            moveInput = Vector2.zero;
+        float speedMultiplier = isDrifting ? driftSpeedMultiplier : 1f;
 
-        if (jumpAction != null)
-            jumpPressed = jumpAction.action.triggered;
-        else
-            jumpPressed = false;
+        Vector3 force = transform.forward * moveInput.y * accelerationForce * Time.fixedDeltaTime * speedMultiplier;
+        rb.AddForce(force);
 
-        if (driftAction != null)
-            driftHeld = driftAction.action.ReadValue<float>() > 0.5f;
-        else
-            driftHeld = false;
-    }
+        // Max speed clamp (boost temporarily increases it)
+        float currentMaxSpeed = boostActive ? maxSpeed + driftBoostAmount : maxSpeed;
 
-    void FixedUpdate()
-    {
-        // compute movement basis (relative to camera)
-        Vector3 basisForward = Vector3.forward;
-        Vector3 basisRight = Vector3.right;
-        if (cameraTransform != null)
+        Vector3 flatVel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+        if (flatVel.magnitude > currentMaxSpeed)
         {
-            Vector3 camF = cameraTransform.forward;
-            camF.y = 0f;
-            if (camF.sqrMagnitude < 0.001f) camF = Vector3.forward;
-            basisForward = camF.normalized;
-            basisRight = Quaternion.Euler(0, 90, 0) * basisForward;
-        }
-
-        Vector3 desiredDir = (basisForward * moveInput.y + basisRight * moveInput.x);
-        float inputMag = Mathf.Clamp01(desiredDir.magnitude);
-        if (inputMag > 0.001f) desiredDir.Normalize();
-
-        // effective max depending on drift/boost
-        float effectiveMax = maxVelocity + (boosting ? activeBoostAmount : 0f);
-        if (driftHeld)
-        {
-            // during drift you are slower (charge builds up)
-            effectiveMax = maxVelocity * driftSlowFactor;
-        }
-
-        Vector3 desiredVelocity = desiredDir * effectiveMax * inputMag;
-
-        // current horizontal velocity
-        Vector3 currentVel = rb.linearVelocity;
-        Vector3 currentHoriz = new Vector3(currentVel.x, 0f, currentVel.z);
-
-        // velocity difference that we want to correct
-        Vector3 velDiff = desiredVelocity - currentHoriz;
-
-        // acceleration modified by weight: heavier = slower response
-        float effectiveAccel = acceleration / Mathf.Max(0.001f, weight);
-
-        // apply acceleration as ForceMode.Acceleration (ignores mass, intuitive tuning)
-        Vector3 accelForce = velDiff * effectiveAccel;
-        rb.AddForce(accelForce, ForceMode.Acceleration);
-
-        // Jump: preserves horizontal momentum automatically because we set only Y velocity.
-        if (jumpPressed && IsGrounded())
-        {
-            Vector3 newVel = rb.linearVelocity;
-            newVel.y = jumpForce;
-            rb.linearVelocity = newVel;
-        }
-
-        // Drift charge mechanic
-        if (driftHeld && inputMag > 0.1f && IsGrounded())
-        {
-            driftCharge += driftBuildRate * Time.fixedDeltaTime;
-            driftCharge = Mathf.Min(driftCharge, driftMaxBoost);
-        }
-
-        // if player releases drift (or stops holding), apply boost if any
-        if (!driftHeld && driftCharge > 0.001f)
-        {
-            StartBoost(driftCharge);
-            driftCharge = 0f;
-        }
-
-        // handle boost timer
-        if (boosting)
-        {
-            boostRemaining -= Time.fixedDeltaTime;
-            if (boostRemaining <= 0f)
-            {
-                boosting = false;
-                activeBoostAmount = 0f;
-            }
+            flatVel = flatVel.normalized * currentMaxSpeed;
+            rb.linearVelocity = new Vector3(flatVel.x, rb.linearVelocity.y, flatVel.z);
         }
     }
 
-    void StartBoost(float amount)
+    private void HandleSteering()
     {
-        activeBoostAmount = Mathf.Clamp(amount, 0f, driftMaxBoost);
-        boosting = true;
-        boostRemaining = driftBoostDuration;
+        float turnAmount = moveInput.x * turnSpeed * Time.fixedDeltaTime;
+        transform.Rotate(0f, turnAmount, 0f);
     }
 
-    bool IsGrounded()
+    private void ApplyDrift()
     {
-        // simple raycast down - make sure player's pivot is at foot area or tweak distance
-        float checkDist = groundCheckDistance + 0.01f;
-        return Physics.Raycast(transform.position, Vector3.down, checkDist, groundMask);
+        Vector3 localVel = transform.InverseTransformDirection(rb.linearVelocity);
+
+        bool wasDrifting = isDrifting;
+        isDrifting = Mathf.Abs(moveInput.x) > 0.1f && moveInput.y > 0.1f;
+
+        if (wasDrifting && !isDrifting)
+        {
+            boostActive = true;
+            boostTimer = driftBoostDuration;
+        }
+
+        float inputMagnitude = Mathf.Abs(moveInput.x);
+        float driftFactor = Mathf.Lerp(driftFactorMin, driftFactorMax, 1f - inputMagnitude);
+        localVel.x *= driftFactor;
+
+        rb.linearVelocity = transform.TransformDirection(localVel);
+    }
+
+    private void HandleBoost()
+    {
+        if (!boostActive) return;
+
+        boostTimer -= Time.fixedDeltaTime;
+        if (boostTimer <= 0f)
+        {
+            boostActive = false;
+            boostTimer = 0f;
+        }
+    }
+
+    private void Jump()
+    {
+        if (IsGrounded())
+        {
+            // Reset vertical velocity for consistent jumps
+            rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+            rb.AddForce(Vector3.up * jumpForce, ForceMode.VelocityChange);
+        }
+    }
+
+    private bool IsGrounded()
+    {
+        Collider col = GetComponent<Collider>();
+        if (col == null) return false;
+
+        // Raycast from slightly above the bottom of the collider
+        Vector3 origin = col.bounds.center - new Vector3(0, col.bounds.extents.y - 0.05f, 0);
+
+        // Draw debug line in scene view
+        if (showDebug)
+            Debug.DrawRay(origin, Vector3.down * groundCheckDistance, Color.red, 0.1f);
+
+        return Physics.Raycast(origin, Vector3.down, groundCheckDistance, groundLayer);
+    }
+
+    private void UpdateDebugText()
+    {
+        if (!showDebug) return;
+
+        debugText =
+            $"--- INPUT ---\n" +
+            $"Move Input: X={moveInput.x:F2}, Y={moveInput.y:F2}\n\n" +
+
+            $"--- DRIFT ---\n" +
+            $"IsDrifting: {isDrifting}\n" +
+            $"DriftFactorMin: {driftFactorMin:F2}\n" +
+            $"DriftFactorMax: {driftFactorMax:F2}\n" +
+            $"DriftSpeedMultiplier: {driftSpeedMultiplier:F2}\n\n" +
+
+            $"--- BOOST ---\n" +
+            $"BoostActive: {boostActive}\n" +
+            $"BoostTimeLeft: {boostTimer:F2}\n" +
+            $"DriftBoostAmount: {driftBoostAmount:F2}\n" +
+            $"DriftBoostDuration: {driftBoostDuration:F2}\n\n" +
+
+            $"--- SPEED ---\n" +
+            $"Linear Velocity: {rb.linearVelocity.magnitude:F2}\n" +
+            $"MaxSpeed: {maxSpeed}\n" +
+            $"CurrentMaxSpeed: {(boostActive ? maxSpeed + driftBoostAmount : maxSpeed):F2}\n\n" +
+
+            $"--- JUMP ---\n" +
+            $"IsGrounded: {IsGrounded()}\n" +
+            $"JumpForce: {jumpForce}\n" +
+            $"GroundCheckDistance: {groundCheckDistance}";
+    }
+
+    private void OnGUI()
+    {
+        if (!showDebug) return;
+
+        GUIStyle style = new GUIStyle();
+        style.fontSize = 16;
+        style.normal.textColor = Color.white;
+        GUI.Label(new Rect(10, 10, 600, 500), debugText, style);
     }
 }
