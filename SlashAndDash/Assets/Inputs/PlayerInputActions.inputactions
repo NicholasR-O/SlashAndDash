@@ -34,7 +34,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Drift",
+                    "name": "Dash",
                     "type": "Button",
                     "id": "faa5bfec-45d2-4672-bbc3-f08fa95a7b1f",
                     "expectedControlType": "",
@@ -128,7 +128,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Drift",
+                    "action": "Dash",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

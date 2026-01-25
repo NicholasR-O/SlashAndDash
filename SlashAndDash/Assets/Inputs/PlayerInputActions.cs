@@ -120,7 +120,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
-                    ""name"": ""Drift"",
+                    ""name"": ""Dash"",
                     ""type"": ""Button"",
                     ""id"": ""faa5bfec-45d2-4672-bbc3-f08fa95a7b1f"",
                     ""expectedControlType"": """",
@@ -214,7 +214,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""Drift"",
+                    ""action"": ""Dash"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -228,7 +228,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_Player_Move = m_Player.FindAction("Move", throwIfNotFound: true);
         m_Player_Look = m_Player.FindAction("Look", throwIfNotFound: true);
         m_Player_Jump = m_Player.FindAction("Jump", throwIfNotFound: true);
-        m_Player_Drift = m_Player.FindAction("Drift", throwIfNotFound: true);
+        m_Player_Dash = m_Player.FindAction("Dash", throwIfNotFound: true);
     }
 
     ~@PlayerInputActions()
@@ -312,7 +312,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Move;
     private readonly InputAction m_Player_Look;
     private readonly InputAction m_Player_Jump;
-    private readonly InputAction m_Player_Drift;
+    private readonly InputAction m_Player_Dash;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -337,9 +337,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @Jump => m_Wrapper.m_Player_Jump;
         /// <summary>
-        /// Provides access to the underlying input action "Player/Drift".
+        /// Provides access to the underlying input action "Player/Dash".
         /// </summary>
-        public InputAction @Drift => m_Wrapper.m_Player_Drift;
+        public InputAction @Dash => m_Wrapper.m_Player_Dash;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -375,9 +375,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Jump.started += instance.OnJump;
             @Jump.performed += instance.OnJump;
             @Jump.canceled += instance.OnJump;
-            @Drift.started += instance.OnDrift;
-            @Drift.performed += instance.OnDrift;
-            @Drift.canceled += instance.OnDrift;
+            @Dash.started += instance.OnDash;
+            @Dash.performed += instance.OnDash;
+            @Dash.canceled += instance.OnDash;
         }
 
         /// <summary>
@@ -398,9 +398,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Jump.started -= instance.OnJump;
             @Jump.performed -= instance.OnJump;
             @Jump.canceled -= instance.OnJump;
-            @Drift.started -= instance.OnDrift;
-            @Drift.performed -= instance.OnDrift;
-            @Drift.canceled -= instance.OnDrift;
+            @Dash.started -= instance.OnDash;
+            @Dash.performed -= instance.OnDash;
+            @Dash.canceled -= instance.OnDash;
         }
 
         /// <summary>
@@ -463,11 +463,11 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnJump(InputAction.CallbackContext context);
         /// <summary>
-        /// Method invoked when associated input action "Drift" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// Method invoked when associated input action "Dash" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnDrift(InputAction.CallbackContext context);
+        void OnDash(InputAction.CallbackContext context);
     }
 }
