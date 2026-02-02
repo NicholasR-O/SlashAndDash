@@ -23,7 +23,9 @@ public class ThirdPersonCamera : MonoBehaviour
     [Header("Rotation")]
     public float fixedPitch = 12f;
     public float lookSpeed = 1.5f;
-    public float autoCenterSpeed = 1.5f;
+    [Tooltip("How fast the camera recenters toward movement direction (higher = faster).")]
+    public float autoCenterSpeed = 3.5f; // increased by default
+    [Tooltip("Multiplier applied to auto-centering when player is airborne.")]
     public float airAutoCenterMultiplier = 0.35f;
     public float lookInputDeadzone = 0.02f;
 
@@ -58,6 +60,7 @@ public class ThirdPersonCamera : MonoBehaviour
         if (player == null) return;
 
         Rigidbody rb = player.GetComponent<Rigidbody>();
+        // simpler grounded check for camera: use small vertical velocity threshold
         bool isGrounded = rb != null && Mathf.Abs(rb.linearVelocity.y) < 0.1f;
 
         Vector2 look = lookAction != null
@@ -65,7 +68,9 @@ public class ThirdPersonCamera : MonoBehaviour
             : Vector2.zero;
 
         // ---------------- HORIZONTAL LOOK (YAW) ----------------
-        if (Mathf.Abs(look.x) > lookInputDeadzone)
+        bool playerIsActivelyLooking = Mathf.Abs(look.x) > lookInputDeadzone;
+
+        if (playerIsActivelyLooking)
         {
             yaw += look.x * lookSpeed * Time.deltaTime * 120f;
         }
@@ -77,6 +82,7 @@ public class ThirdPersonCamera : MonoBehaviour
                 float targetYaw = Mathf.Atan2(flatVel.x, flatVel.z) * Mathf.Rad2Deg;
                 float airMult = isGrounded ? 1f : airAutoCenterMultiplier;
 
+                // increase rate of recentering via autoCenterSpeed
                 yaw = Mathf.LerpAngle(
                     yaw,
                     targetYaw,

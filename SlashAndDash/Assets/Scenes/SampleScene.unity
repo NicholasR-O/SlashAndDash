@@ -144,7 +144,7 @@ Transform:
   m_GameObject: {fileID: 142409248}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.5, y: -0.5, z: -0.5}
+  m_LocalPosition: {x: 0.5, y: -0.6, z: -0.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -328,7 +328,7 @@ Transform:
   m_GameObject: {fileID: 243145859}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.5, y: -0.5, z: 0.5}
+  m_LocalPosition: {x: 0.5, y: -0.6, z: 0.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -413,19 +413,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   accelerationForce: 200
-  maxSpeed: 10
+  maxSpeed: 16
   turnSpeed: 150
   driftBoostAmount: 15
   driftBoostDuration: 2
   jumpForce: 10
-  groundCheckDistance: 1
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
   centerOfMassOffset: {x: 0, y: -0.7, z: -0.4}
   groundAngularDamping: 10
   airAngularDamping: 3
-  rampPitchDamping: 0.35
+  rampPitchDamping: 0.3
   groundedDownforce: 35
   airGravityMultiplier: 1.6
   fallGravityMultiplier: 2.2
@@ -433,8 +432,12 @@ MonoBehaviour:
   driftGripRecovery: 6
   minDriftSpeed: 6
   driftSteerMultiplier: 1.25
-  driftChargeRate: 1
-  maxDriftBoost: 12
+  driftChargeTime: 1
+  maxDriftBoost: 25
+  frontPivotDistance: 6
+  rearPivotDistance: 4
+  driftYawTorque: 60
+  lateralSlipThreshold: 2
   airDashForce: 18
   airDashUpForce: 4
   airDashCooldown: 0.15
@@ -444,8 +447,64 @@ MonoBehaviour:
   - {fileID: 142409249}
   - {fileID: 1562832485}
   suspensionDistance: 0.3
-  suspensionStiffness: 50
-  suspensionDamping: 10
+  suspensionStiffness: 100
+  suspensionDamping: 9.904545
+  suspensionMaxForcePerWheel: 20000
+  tireGrip: 1
+  gripCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: -0.6
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0.4
+      inSlope: -0.6
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  frontTireGrip: 1
+  rearTireGrip: 1
+  tireGripSpeedFalloff: 0.6
+  frontRollingResistance: 0.1
+  rearRollingResistance: 0.1
+  frontCoastDrag: 0.033333335
+  rearCoastDrag: 0.033333335
+  brakeForce: 10
+  driftRearRollingResistanceMultiplier: 0.45
+  downhillAcceleration: 12
+  maxDriveSlopeAngle: 50
+  steepSlopeSlideForce: 0
+  leaveGroundForwardBoost: 0.25
+  slopeSampleDistance: 1
+  minSlopeAngleToAffect: 1
+  showSuspensionRays: 1
+  showSurfaceNormals: 1
+  driveableColor: {r: 0, g: 1, b: 0, a: 1}
+  steepColor: {r: 1, g: 0, b: 0, a: 1}
+  debugSphereSize: 0.08
+  vehicleMass: 2
+  wheelBase: 0.6
+  trackWidth: 1.6
+  comHeight: 0.5
+  frontWeightRatio: 0.5
+  autoCalculatePhysics: 1
+  suspensionStiffnessScale: 3
+  suspensionDampingScale: 1
+  gripScale: 1
+  rollingResistanceScale: 1
 --- !u!54 &286961535
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -457,7 +516,7 @@ Rigidbody:
   m_Mass: 2
   m_Drag: 0
   m_AngularDrag: 0
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_CenterOfMass: {x: 0, y: -1.2, z: -0.4}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
   m_IncludeLayers:
@@ -466,7 +525,7 @@ Rigidbody:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_ImplicitCom: 1
+  m_ImplicitCom: 0
   m_ImplicitTensor: 1
   m_UseGravity: 1
   m_IsKinematic: 0
@@ -2368,7 +2427,7 @@ Transform:
   m_GameObject: {fileID: 966720698}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.5, y: -0.5, z: 0.5}
+  m_LocalPosition: {x: -0.5, y: -0.6, z: 0.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4075,7 +4134,7 @@ Transform:
   m_GameObject: {fileID: 1562832484}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.5, y: -0.5, z: -0.5}
+  m_LocalPosition: {x: -0.5, y: -0.6, z: -0.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
