@@ -1,0 +1,4 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:Template name="ReticleLayout" src="project://database/Assets/UI/ReticleLayout.uxml?fileID=9197481963319205126&amp;guid=af94f7b48b5687946a127a41bf42a204&amp;type=3#ReticleLayout" />
+    <ui:Instance template="ReticleLayout" />
+</ui:UXML>
