@@ -5,7 +5,8 @@ public class ThirdPersonCamera : MonoBehaviour
 {
     [Header("References")]
     public Transform player;
-    public Transform cameraRoot;
+    public Transform cameraRoot; // usually this.transform
+    public Camera targetCamera;  // MUST be the Main Camera
 
     [Header("Camera Offset")]
     public Vector3 baseOffset = new Vector3(0f, 1.8f, -3.5f);
@@ -22,9 +23,19 @@ public class ThirdPersonCamera : MonoBehaviour
     public float maxAimPitch = 60f;
     public float autoCenterSpeed = 3.5f;
 
+    [Header("Sensitivity")]
+    [Range(0.1f, 3f)]
+    public float sensitivity = 1f;
+
     [Header("Lag")]
     public float positionLag = 10f;
     public float rotationLag = 12f;
+
+    [Header("FOV")]
+    public float baseFOV = 70f;
+    public float aimFOV = 55f;
+    public float boostFOV = 80f;
+    public float fovLerpSpeed = 10f;
 
     [Header("Input")]
     public InputActionReference lookAction;
@@ -42,9 +53,29 @@ public class ThirdPersonCamera : MonoBehaviour
 
     void Start()
     {
+        // ---------- HARD SAFETY CHECKS ----------
+        if (targetCamera == null)
+        {
+            Debug.LogError("[ThirdPersonCamera] Target Camera is not assigned.");
+            enabled = false;
+            return;
+        }
+
+        if (!targetCamera.CompareTag("MainCamera"))
+        {
+            Debug.LogError("[ThirdPersonCamera] Target Camera must be tagged MainCamera.");
+            enabled = false;
+            return;
+        }
+
+        if (cameraRoot == null)
+            cameraRoot = targetCamera.transform;
+
         yaw = cameraRoot.eulerAngles.y;
         pitch = fixedPitch;
         currentDistance = -baseOffset.z;
+
+        targetCamera.fieldOfView = baseFOV;
     }
 
     void LateUpdate()
@@ -52,7 +83,7 @@ public class ThirdPersonCamera : MonoBehaviour
         if (player == null) return;
 
         Rigidbody rb = player.GetComponent<Rigidbody>();
-        Vector2 look = lookAction.action.ReadValue<Vector2>();
+        Vector2 look = lookAction.action.ReadValue<Vector2>() * sensitivity;
 
         float dt = GrappleController.IsAimingStatic
             ? Time.unscaledDeltaTime
@@ -74,6 +105,7 @@ public class ThirdPersonCamera : MonoBehaviour
         else
         {
             yaw += look.x * lookSpeed * dt * 120f;
+            pitch = fixedPitch;
 
             if (rb != null)
             {
@@ -84,8 +116,6 @@ public class ThirdPersonCamera : MonoBehaviour
                     yaw = Mathf.LerpAngle(yaw, targetYaw, autoCenterSpeed * dt);
                 }
             }
-
-            pitch = fixedPitch;
         }
 
         Quaternion targetRot = Quaternion.Euler(pitch, yaw, 0f);
@@ -103,6 +133,20 @@ public class ThirdPersonCamera : MonoBehaviour
             cameraRoot.rotation,
             targetRot,
             rotationLag * dt
+        );
+
+        // ---------------- FOV ----------------
+        float targetFOV = baseFOV;
+
+        if (GrappleController.IsAimingStatic)
+            targetFOV = aimFOV;
+        else if (rb != null && rb.linearVelocity.magnitude > 20f)
+            targetFOV = boostFOV;
+
+        targetCamera.fieldOfView = Mathf.Lerp(
+            targetCamera.fieldOfView,
+            targetFOV,
+            fovLerpSpeed * dt
         );
     }
 }
