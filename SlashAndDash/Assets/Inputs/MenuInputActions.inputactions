@@ -1,0 +1,35 @@
+{
+    "version": 1,
+    "name": "MenuInputActions",
+    "maps": [
+        {
+            "name": "PauseMenu",
+            "id": "82cb1ba2-ab06-440f-9e4c-ff2a3bff5e97",
+            "actions": [
+                {
+                    "name": "Pause",
+                    "type": "Button",
+                    "id": "d6ddaf83-9969-4f1d-95ac-245c8f0d84e9",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "17002d96-b3bf-488e-b1cc-b46858bb4db3",
+                    "path": "<Keyboard>/tab",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Pause",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}

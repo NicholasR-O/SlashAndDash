@@ -1,0 +1,87 @@
+.options-root {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(8, 12, 20, 0.68);
+}
+
+.options-panel {
+    width: 420px;
+    max-width: 92%;
+    padding-top: 20px;
+    padding-right: 20px;
+    padding-bottom: 20px;
+    padding-left: 20px;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.2);
+    border-right-color: rgba(255, 255, 255, 0.2);
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+    border-left-color: rgba(255, 255, 255, 0.2);
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+    border-bottom-left-radius: 10px;
+    background-color: rgba(16, 24, 38, 0.95);
+    flex-direction: column;
+}
+
+.options-title {
+    margin-bottom: 18px;
+    color: rgb(244, 247, 252);
+    font-size: 26px;
+    -unity-font-style: bold;
+}
+
+.option-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.option-label {
+    min-width: 94px;
+    color: rgb(225, 232, 241);
+    font-size: 15px;
+}
+
+.sensitivity-slider {
+    flex-grow: 1;
+    margin-left: 12px;
+    margin-right: 12px;
+}
+
+.sensitivity-slider .unity-base-slider__tracker {
+    height: 7px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    background-color: rgba(94, 114, 143, 0.6);
+}
+
+.sensitivity-slider .unity-base-slider__dragger {
+    width: 15px;
+    height: 15px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    background-color: rgb(95, 190, 245);
+}
+
+.sensitivity-slider .unity-base-slider__dragger-border {
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.option-value {
+    min-width: 44px;
+    color: rgb(198, 230, 248);
+    font-size: 14px;
+    -unity-text-align: middle-right;
+}

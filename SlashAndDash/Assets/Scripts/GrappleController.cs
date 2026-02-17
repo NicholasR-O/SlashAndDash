@@ -14,12 +14,19 @@ public class GrappleController : MonoBehaviour
     [Header("Grapple")]
     public GrappleProjectile grappleProjectilePrefab;
     public float fireCooldown = 0.25f;
-    public float launchForce = 45f;
+    public LayerMask enemyLayerMask = ~0;
 
     [Header("Aiming")]
     public float aimTimeScale = 0.35f;
-    public float holdPointAimDistance = 1.2f;
-    public float holdPointAimSmooth = 12f;
+    public float lockAcquireRadius = 20f;
+    public float lockMaxAngle = 55f;
+
+    [Header("Throw Targeting")]
+    public float holdEnemyLockRange = 40f;
+    public float throwLockSuppressTime = 0.35f;
+    public float throwTrackingDuration = 2f;
+    public float throwFlyingSpeedThreshold = 2.5f;
+    public LayerMask visibilityMask = ~0;
 
     [Header("Input")]
     public InputActionReference aimAction;
@@ -29,24 +36,27 @@ public class GrappleController : MonoBehaviour
 
     GrappleProjectile activeProjectile;
     float fireTimer;
+    float lockSuppressedUntil;
+    float throwStartTime;
+    Rigidbody recentlyThrownEnemy;
+    Transform lockedTarget;
 
-    Vector3 cameraHoldPointVelocity;
+    public Transform LockedTarget => lockedTarget;
 
-    public Transform CurrentHoldPoint =>
-        IsAimingStatic ? cameraHoldPoint : carHoldPoint;
+    public Transform CurrentHoldPoint => IsAimingStatic ? cameraHoldPoint : carHoldPoint;
 
     void OnEnable()
     {
         aimAction?.action.Enable();
         fireAction?.action.Enable();
-
-        fireAction.action.performed += _ => OnFirePressed();
+        if (fireAction != null)
+            fireAction.action.performed += OnFirePerformed;
     }
 
     void OnDisable()
     {
-        fireAction.action.performed -= _ => OnFirePressed();
-
+        if (fireAction != null)
+            fireAction.action.performed -= OnFirePerformed;
         aimAction?.action.Disable();
         fireAction?.action.Disable();
     }
@@ -54,20 +64,14 @@ public class GrappleController : MonoBehaviour
     void Update()
     {
         HandleAimingState();
-        UpdateCameraHoldPoint();
-
-        if (fireTimer > 0f)
-            fireTimer -= Time.unscaledDeltaTime;
+        UpdateLockOn();
+        if (fireTimer > 0f) fireTimer -= Time.unscaledDeltaTime;
     }
-
-    // ---------------- AIMING ----------------
 
     void HandleAimingState()
     {
         bool aiming = aimAction != null && aimAction.action.ReadValue<float>() > 0.1f;
-
-        if (aiming == IsAimingStatic)
-            return;
+        if (aiming == IsAimingStatic) return;
 
         IsAimingStatic = aiming;
 
@@ -78,80 +82,138 @@ public class GrappleController : MonoBehaviour
         }
         else
         {
+            lockedTarget = null;
             Time.timeScale = 1f;
             Time.fixedDeltaTime = 0.02f;
         }
     }
 
-    void UpdateCameraHoldPoint()
+    void UpdateLockOn()
     {
-        if (!cameraHoldPoint || !mainCamera)
+        if (!IsAimingStatic || mainCamera == null || grappleProjectilePrefab == null)
+        {
+            lockedTarget = null;
             return;
-
-        if (IsAimingStatic)
-        {
-            Vector3 target =
-                mainCamera.transform.position +
-                mainCamera.transform.forward * holdPointAimDistance;
-
-            cameraHoldPoint.position = Vector3.SmoothDamp(
-                cameraHoldPoint.position,
-                target,
-                ref cameraHoldPointVelocity,
-                1f / holdPointAimSmooth,
-                Mathf.Infinity,
-                Time.unscaledDeltaTime
-            );
         }
-        else
+
+        if (IsThrowLockActive())
         {
-            cameraHoldPoint.position = carHoldPoint.position;
-            cameraHoldPointVelocity = Vector3.zero;
+            lockedTarget = null;
+            return;
         }
+
+        bool isHoldingEnemy = activeProjectile != null && activeProjectile.IsHoldingEnemy;
+        float grappleRange = grappleProjectilePrefab.maxRange;
+        float maxRange = isHoldingEnemy ? Mathf.Max(grappleRange, holdEnemyLockRange) : grappleRange;
+        float acquireRadius = isHoldingEnemy ? Mathf.Max(lockAcquireRadius, holdEnemyLockRange) : lockAcquireRadius;
+
+        Transform hold = CurrentHoldPoint != null ? CurrentHoldPoint : mainCamera.transform;
+        Vector3 origin = hold.position;
+        Vector3 forward = mainCamera.transform.forward;
+
+        Collider[] hits = Physics.OverlapSphere(origin, acquireRadius, enemyLayerMask, QueryTriggerInteraction.Collide);
+        Transform bestTarget = null;
+        float bestScore = float.MinValue;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider c = hits[i];
+            if (!c.CompareTag("Enemy")) continue;
+
+            Transform candidate = c.attachedRigidbody != null ? c.attachedRigidbody.transform : c.transform;
+            Vector3 toTarget = candidate.position - origin;
+            float distance = toTarget.magnitude;
+            if (distance > maxRange) continue;
+            if (distance < 0.001f) continue;
+
+            bool isBeyondGrapple = distance > grappleRange;
+            if (isBeyondGrapple && (!isHoldingEnemy || !HasLineOfSight(origin, c, candidate)))
+                continue;
+
+            Vector3 dir = toTarget / distance;
+            float angle = Vector3.Angle(forward, dir);
+            if (angle > lockMaxAngle) continue;
+
+            // Favor center-screen and closer targets.
+            float score = Vector3.Dot(forward, dir) * 100f - distance;
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestTarget = candidate;
+            }
+        }
+
+        lockedTarget = bestTarget;
     }
 
-    // ---------------- FIRE LOGIC ----------------
+    bool HasLineOfSight(Vector3 origin, Collider targetCollider, Transform targetTransform)
+    {
+        Vector3 targetPoint = targetCollider.bounds.center;
+        Vector3 toTarget = targetPoint - origin;
+        float distance = toTarget.magnitude;
+        if (distance < 0.001f) return false;
+
+        Vector3 dir = toTarget / distance;
+        if (Physics.Raycast(origin, dir, out RaycastHit hit, distance, visibilityMask, QueryTriggerInteraction.Ignore))
+        {
+            if (hit.collider == targetCollider) return true;
+            if (hit.rigidbody != null && hit.rigidbody.transform == targetTransform) return true;
+            return false;
+        }
+
+        return true;
+    }
+
+    bool IsThrowLockActive()
+    {
+        if (Time.unscaledTime < lockSuppressedUntil)
+            return true;
+
+        if (recentlyThrownEnemy == null)
+            return false;
+
+        if (Time.unscaledTime - throwStartTime > throwTrackingDuration)
+        {
+            recentlyThrownEnemy = null;
+            return false;
+        }
+
+        if (recentlyThrownEnemy.linearVelocity.sqrMagnitude > throwFlyingSpeedThreshold * throwFlyingSpeedThreshold)
+            return true;
+
+        recentlyThrownEnemy = null;
+        return false;
+    }
+
+    void OnFirePerformed(InputAction.CallbackContext _)
+    {
+        OnFirePressed();
+    }
 
     void OnFirePressed()
     {
-        // CASE 1: Holding an enemy → launch it
         if (activeProjectile != null && activeProjectile.IsHoldingEnemy)
         {
             LaunchHeldEnemy();
             return;
         }
 
-        // CASE 2: Fire grapple normally
-        TryFire();
-    }
+        if (!IsAimingStatic) return;
+        if (activeProjectile != null) return;
+        if (fireTimer > 0f) return;
 
-    void TryFire()
-    {
-        if (!IsAimingStatic)
-            return;
-
-        if (activeProjectile != null)
-            return;
-
-        if (fireTimer > 0f)
-            return;
-
-        FireGrapple();
-    }
-
-    void FireGrapple()
-    {
         fireTimer = fireCooldown;
 
         Transform hold = CurrentHoldPoint;
-
-        GrappleProjectile projectile = Instantiate(
-            grappleProjectilePrefab,
-            hold.position,
-            Quaternion.identity
-        );
-
+        GrappleProjectile projectile = Instantiate(grappleProjectilePrefab, hold.position, hold.rotation);
         Vector3 direction = mainCamera.transform.forward;
+
+        if (lockedTarget != null)
+        {
+            Vector3 toTarget = lockedTarget.position - hold.position;
+            if (toTarget.sqrMagnitude > 0.0001f)
+                direction = toTarget.normalized;
+        }
 
         projectile.Initialize(this, direction);
         activeProjectile = projectile;
@@ -160,28 +222,42 @@ public class GrappleController : MonoBehaviour
     void LaunchHeldEnemy()
     {
         Rigidbody enemyRb = activeProjectile.ReleaseEnemy();
-
         if (enemyRb != null)
         {
             enemyRb.linearVelocity = Vector3.zero;
-            enemyRb.AddForce(mainCamera.transform.forward * launchForce, ForceMode.VelocityChange);
+            enemyRb.AddForce(mainCamera.transform.forward * 45f, ForceMode.VelocityChange);
+            recentlyThrownEnemy = enemyRb;
+            throwStartTime = Time.unscaledTime;
 
-            // Arm the enemy explosion if possible
-            EnemyExplodeOnThrow explodeComponent = enemyRb.GetComponent<EnemyExplodeOnThrow>();
-            if (explodeComponent != null)
-            {
-                explodeComponent.ArmExplosion();
-            }
+            Enemy enemy = enemyRb.GetComponent<Enemy>();
+            if (enemy != null)
+                enemy.ArmExplosion();
         }
+
+        lockSuppressedUntil = Time.unscaledTime + throwLockSuppressTime;
+        lockedTarget = null;
 
         activeProjectile.DestroySelf();
         activeProjectile = null;
     }
 
-    // ---------------- CALLBACK ----------------
-
     public void OnProjectileFinished()
     {
         activeProjectile = null;
+    }
+
+    void OnDrawGizmosSelected()
+    {
+        if (mainCamera == null || grappleProjectilePrefab == null) return;
+
+        Gizmos.color = new Color(0f, 1f, 1f, 0.35f);
+        Gizmos.DrawWireSphere(mainCamera.transform.position, lockAcquireRadius);
+
+        if (lockedTarget != null)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(mainCamera.transform.position, lockedTarget.position);
+            Gizmos.DrawWireSphere(lockedTarget.position, 0.35f);
+        }
     }
 }

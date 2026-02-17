@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ui="UnityEngine.UIElements"
+    xmlns:uie="UnityEditor.UIElements"
+    xsi:noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd"
+>
+    <Style src="project://database/Assets/UI/OptionsMenuStyleSheet.uss?fileID=7433441132597879392&amp;guid=1a87e8ed856fd41469553d848ed8673b&amp;type=3#OptionsMenuStyleSheet" />
+    <ui:VisualElement name="options-root" class="options-root">
+        <ui:VisualElement name="options-panel" class="options-panel">
+            <ui:Label text="Options" class="options-title" />
+            <ui:VisualElement class="option-row">
+                <ui:Label text="Sensitivity" class="option-label" />
+                <ui:Slider name="sensitivity-slider" class="sensitivity-slider" />
+                <ui:Label name="sensitivity-value" text="1.00" class="option-value" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

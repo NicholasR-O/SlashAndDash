@@ -1,4 +1,0 @@
-<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
-    <Style src="project://database/Assets/UI/ReticleStyle.uss?fileID=7433441132597879392&amp;guid=14e6cca3c2d66ef42b5c66dc979a03cf&amp;type=3#ReticleStyle" />
-    <ui:VisualElement name="crosshair" style="flex-grow: 1; background-image: url(&quot;project://database/Assets/UI/crosshair.png?fileID=2800000&amp;guid=70bd6ea91014f914c8d94d692ee808cf&amp;type=3#crosshair&quot;);" />
-</ui:UXML>

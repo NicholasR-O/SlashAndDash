@@ -11,19 +11,11 @@ public class GrappleProjectile : MonoBehaviour
 
     Rigidbody rb;
     GrappleController controller;
-
     Vector3 fireDirection;
     Vector3 startPosition;
-
     Rigidbody attachedEnemy;
 
-    enum State
-    {
-        Flying,
-        Returning,
-        HoldingEnemy
-    }
-
+    enum State { Flying, Returning, HoldingEnemy }
     State state;
 
     public bool IsHoldingEnemy => state == State.HoldingEnemy;
@@ -35,7 +27,6 @@ public class GrappleProjectile : MonoBehaviour
         startPosition = transform.position;
 
         rb = GetComponent<Rigidbody>();
-
         rb.isKinematic = false;
         rb.useGravity = false;
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
@@ -55,83 +46,61 @@ public class GrappleProjectile : MonoBehaviour
                 break;
 
             case State.Returning:
-                ReturnToCar();
+                ReturnToHoldPoint();
                 break;
 
             case State.HoldingEnemy:
-                HoldAtPoint();
+                HoldAtCurrentPoint();
                 break;
         }
     }
-
-    // ---------------- HIT DETECTION ----------------
 
     void CheckForwardHit()
     {
         float stepDistance = rb.linearVelocity.magnitude * Time.fixedDeltaTime;
 
-        if (Physics.SphereCast(
-            transform.position,
-            hitRadius,
-            fireDirection,
-            out RaycastHit hit,
-            stepDistance,
-            ~0,
-            QueryTriggerInteraction.Collide
-        ))
+        if (Physics.SphereCast(transform.position, hitRadius, fireDirection,
+            out RaycastHit hit, stepDistance, ~0, QueryTriggerInteraction.Collide))
         {
-            HandleHit(hit.collider, hit.rigidbody, hit.point);
+            HandleHit(hit.collider, hit.rigidbody);
         }
     }
 
     void OnCollisionEnter(Collision col)
     {
-        if (state != State.Flying)
-            return;
-
-        HandleHit(col.collider, col.rigidbody, col.contacts[0].point);
+        if (state != State.Flying) return;
+        HandleHit(col.collider, col.rigidbody);
     }
 
     void OnTriggerEnter(Collider other)
     {
-        if (state != State.Flying)
-            return;
-
-        HandleHit(other, other.attachedRigidbody, transform.position);
+        if (state != State.Flying) return;
+        HandleHit(other, other.attachedRigidbody);
     }
 
-    void HandleHit(Collider collider, Rigidbody hitRb, Vector3 hitPoint)
+    void HandleHit(Collider collider, Rigidbody hitRb)
     {
-        // Enemy
         if (hitRb != null && collider.CompareTag("Enemy"))
-        {
             AttachEnemy(hitRb);
-        }
-        // Environment
         else
-        {
             BeginReturn();
-        }
     }
-
-    // ---------------- RANGE ----------------
 
     void CheckRange()
     {
         if (Vector3.Distance(startPosition, transform.position) >= maxRange)
-        {
             BeginReturn();
-        }
     }
-
-    // ---------------- ENEMY ----------------
 
     void AttachEnemy(Rigidbody enemy)
     {
-        if (state != State.Flying)
-            return;
+        if (state != State.Flying) return;
 
         attachedEnemy = enemy;
+
+        // Zero velocity BEFORE making kinematic
+        attachedEnemy.linearVelocity = Vector3.zero;
+        attachedEnemy.angularVelocity = Vector3.zero;
         attachedEnemy.isKinematic = true;
 
         rb.linearVelocity = Vector3.zero;
@@ -142,30 +111,25 @@ public class GrappleProjectile : MonoBehaviour
 
     public Rigidbody ReleaseEnemy()
     {
-        if (attachedEnemy == null)
-            return null;
+        if (attachedEnemy == null) return null;
 
         Rigidbody released = attachedEnemy;
         released.isKinematic = false;
-        attachedEnemy = null;
 
+        attachedEnemy = null;
         return released;
     }
 
-    // ---------------- RETURN ----------------
-
     void BeginReturn()
     {
-        if (state == State.Returning)
-            return;
+        if (state == State.Returning) return;
 
         rb.linearVelocity = Vector3.zero;
         rb.isKinematic = true;
-
         state = State.Returning;
     }
 
-    void ReturnToCar()
+    void ReturnToHoldPoint()
     {
         Transform hold = controller.CurrentHoldPoint;
 
@@ -175,6 +139,8 @@ public class GrappleProjectile : MonoBehaviour
             returnSpeed * Time.fixedDeltaTime
         );
 
+        transform.rotation = hold.rotation;
+
         if (Vector3.Distance(transform.position, hold.position) < 0.15f)
         {
             controller.OnProjectileFinished();
@@ -182,21 +148,19 @@ public class GrappleProjectile : MonoBehaviour
         }
     }
 
-    // ---------------- HOLD ----------------
-
-    void HoldAtPoint()
+    void HoldAtCurrentPoint()
     {
         Transform hold = controller.CurrentHoldPoint;
 
         transform.position = hold.position;
+        transform.rotation = hold.rotation;
 
         if (attachedEnemy != null)
         {
             attachedEnemy.transform.position = hold.position;
+            attachedEnemy.transform.rotation = hold.rotation;
         }
     }
-
-    // ---------------- CLEANUP ----------------
 
     public void DestroySelf()
     {

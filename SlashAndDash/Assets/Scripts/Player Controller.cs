@@ -7,139 +7,154 @@ using UnityEngine.InputSystem;
 public class CarController : MonoBehaviour
 {
     [Header("Movement")]
-    public float accelerationForce = 1300f;
-    public float maxSpeed = 22f;
-    public float turnSpeed = 120f;
+    [SerializeField] private float accelerationForce = 1300f;
+    [SerializeField] private float maxSpeed = 22f;
+    [SerializeField] private float turnSpeed = 120f;
 
     [Header("Boost")]
-    public float driftBoostAmount = 12f; // dynamic on drift end
-    public float driftBoostDuration = 1.2f;
+    [SerializeField] private float driftBoostAmount = 12f; // dynamic on drift end
+    [SerializeField] private float driftBoostDuration = 1.2f;
 
     [Header("Jump")]
-    public float jumpForce = 9f;
-    public LayerMask groundLayer;
+    [SerializeField] private float jumpForce = 9f;
+    [SerializeField] private LayerMask groundLayer;
 
     [Header("Arcade Stability")]
-    public Vector3 centerOfMassOffset = new Vector3(0f, -0.7f, -0.4f);
-    public float groundAngularDamping = 10f;
-    public float airAngularDamping = 3f;
-    public float rampPitchDamping = 0.35f;
-    public float groundedDownforce = 35f;
+    [SerializeField] private Vector3 centerOfMassOffset = new Vector3(0f, -0.7f, -0.4f);
+    [SerializeField] private float groundAngularDamping = 10f;
+    [SerializeField] private float airAngularDamping = 3f;
+    [SerializeField] private float rampPitchDamping = 0.35f;
+    [SerializeField] private float groundedDownforce = 35f;
 
     [Header("Arcade Gravity")]
-    public float airGravityMultiplier = 1.6f;
-    public float fallGravityMultiplier = 2.2f;
+    [SerializeField] private float airGravityMultiplier = 1.6f;
+    [SerializeField] private float fallGravityMultiplier = 2.2f;
 
     [Header("Arcade Drift")]
-    public float driftSideForce = 2200f;
-    public float driftGripRecovery = 3.5f;
-    public float minDriftSpeed = 5f;
-    public float driftSteerMultiplier = 1.25f;
+    [SerializeField] private float driftSideForce = 2200f;
+    [SerializeField] private float driftGripRecovery = 3.5f;
+    [SerializeField] private float minDriftSpeed = 5f;
+    [SerializeField] private float driftSteerMultiplier = 1.45f;
+    [Tooltip("Extra side-force multiplier applied at lower speeds so drift is still noticeable.")]
+    [SerializeField] private float lowSpeedDriftSideForceMultiplier = 1.6f;
+    [Tooltip("Minimum yaw factor while drifting so low-speed drift rotation remains visible.")]
+    [SerializeField] private float minDriftYawFactor = 0.35f;
+    [Tooltip("Overall lateral tire grip multiplier while drifting (<1 = more slide).")]
+    [SerializeField] private float driftLateralGripMultiplier = 0.6f;
+    [Tooltip("Front wheel lateral grip multiplier while drifting.")]
+    [SerializeField] private float driftFrontGripMultiplier = 0.8f;
+    [Tooltip("Rear wheel lateral grip multiplier while drifting.")]
+    [SerializeField] private float driftRearGripMultiplier = 0.5f;
+    [Tooltip("Extra yaw torque multiplier while drifting to take larger turns.")]
+    [SerializeField] private float driftYawTorqueMultiplier = 1.35f;
 
-    [Tooltip("Seconds of continuous drifting to reach full drift boost (1.0 = 1s to full).")]
-    public float driftChargeTime = 1f;
-    public float maxDriftBoost = 12f;
+    [Tooltip("Seconds of continuous drifting required before drift boost can trigger.")]
+    [SerializeField] private float driftChargeTime = 1f;
+    [SerializeField] private float maxDriftBoost = 12f;
 
     [Header("Drift Pivoting (front vs rear balance)")]
-    public float frontPivotDistance = 3.0f;
-    public float rearPivotDistance = 2.0f;
-    public float driftYawTorque = 80f;
-    public float lateralSlipThreshold = 2.0f;
+    [SerializeField] private float frontPivotDistance = 3.0f;
+    [SerializeField] private float rearPivotDistance = 2.0f;
+    [SerializeField] private float driftYawTorque = 80f;
+    [SerializeField] private float lateralSlipThreshold = 2.0f;
 
     private float driftCharge = 0f;
+    private float driftTimer = 0f;
 
     [Header("Air Dash")]
-    public float airDashForce = 20f;
-    public float airDashUpForce = 4f;
-    public float airDashCooldown = 0.15f;
+    [SerializeField] private float airDashForce = 28f;
+    [SerializeField] private float airDashUpForce = 4f;
+    [SerializeField] private float airDashCooldown = 0.15f;
+    [Tooltip("How much existing forward velocity is carried into the air dash.")]
+    [SerializeField] private float airDashForwardCarry = 0.35f;
 
     [Header("Fake Wheels / Suspension")]
     [Tooltip("Wheel contact transforms (any order). Place near contact point bottom of each corner).")]
-    public Transform[] wheelTransforms;
+    [SerializeField] private Transform[] wheelTransforms;
     [Tooltip("Distance above wheel used as the ray origin; ray length = suspensionDistance * 2")]
-    public float suspensionDistance = 0.5f;
+    [SerializeField] private float suspensionDistance = 0.5f;
     [Tooltip("Spring stiffness. Large numbers ok — we're using ForceMode.Acceleration.")]
-    public float suspensionStiffness = 20000f;
+    [SerializeField] private float suspensionStiffness = 20000f;
     [Tooltip("Suspension damper; reduces oscillation.")]
-    public float suspensionDamping = 500f;
+    [SerializeField] private float suspensionDamping = 500f;
     [Tooltip("Clamps per-wheel suspension force.")]
-    public float suspensionMaxForcePerWheel = 20000f;
+    [SerializeField] private float suspensionMaxForcePerWheel = 20000f;
 
     [Header("Tire Grip (speed-dependent)")]
     [Tooltip("Base lateral grip per wheel (higher = less sliding).")]
-    public float tireGrip = 60f;
+    [SerializeField] private float tireGrip = 60f;
     [Tooltip("Curve that maps speed ratio (0..1) to grip multiplier. X= speed ratio, Y = multiplier.")]
-    public AnimationCurve gripCurve = AnimationCurve.Linear(0f, 1f, 1f, 0.4f);
+    [SerializeField] private AnimationCurve gripCurve = AnimationCurve.Linear(0f, 1f, 1f, 0.4f);
     [Tooltip("Front/rear multipliers applied to base tireGrip (1 = same as base).")]
-    public float frontTireGrip = 1f;
-    public float rearTireGrip = 1f;
+    [SerializeField] private float frontTireGrip = 1f;
+    [SerializeField] private float rearTireGrip = 1f;
     [Tooltip("Grip falls off additionally with forward speed multiplier (legacy multiplier kept for quick tuning).")]
-    public float tireGripSpeedFalloff = 0.6f;
+    [SerializeField] private float tireGripSpeedFalloff = 0.6f;
 
     [Header("Rolling Resistance / Braking (front/rear)")]
     [Tooltip("Longitudinal rolling resistance (front wheels).")]
-    public float frontRollingResistance = 18f;
+    [SerializeField] private float frontRollingResistance = 18f;
     [Tooltip("Longitudinal rolling resistance (rear wheels).")]
-    public float rearRollingResistance = 18f;
+    [SerializeField] private float rearRollingResistance = 18f;
     [Tooltip("Coast drag applied per-wheel when player is not giving throttle (front).")]
-    public float frontCoastDrag = 20f;
+    [SerializeField] private float frontCoastDrag = 20f;
     [Tooltip("Coast drag applied per-wheel when player is not giving throttle (rear).")]
-    public float rearCoastDrag = 20f;
+    [SerializeField] private float rearCoastDrag = 20f;
     [Tooltip("Braking force applied per-wheel when the player pulls negative throttle (brake/reverse).")]
-    public float brakeForce = 80f;
+    [SerializeField] private float brakeForce = 80f;
     [Tooltip("Multiplier applied to rear rolling resistance while drifting; <1 reduces rear resistance to help maintain slide.")]
-    public float driftRearRollingResistanceMultiplier = 0.45f;
+    [SerializeField] private float driftRearRollingResistanceMultiplier = 0.45f;
 
     [Header("Hill / Slope")]
     [Tooltip("How much extra acceleration you get when going downhill (units of ForceMode.Acceleration). Set to 0 to disable.")]
-    public float downhillAcceleration = 12f;
+    [SerializeField] private float downhillAcceleration = 12f;
 
     [Header("Slope Limits")]
     [Tooltip("Maximum slope angle (deg) car can drive up. Set >= 45 for 45° ramps to be climbable.")]
-    public float maxDriveSlopeAngle = 60f;
-    public float steepSlopeSlideForce = 25f;
+    [SerializeField] private float maxDriveSlopeAngle = 60f;
+    [SerializeField] private float steepSlopeSlideForce = 25f;
 
     [Header("Leave Ground")]
-    public float leaveGroundForwardBoost = 0.25f;
+    [SerializeField] private float leaveGroundForwardBoost = 0.25f;
 
     [Header("Slope Sampling")]
     [Tooltip("How far forwards/back from the car center to sample the ground for slope calculation (meters).")]
-    public float slopeSampleDistance = 1.0f;
+    [SerializeField] private float slopeSampleDistance = 1.0f;
     [Tooltip("Ignore very small slopes (degrees) so tiny bumps don't count.")]
-    public float minSlopeAngleToAffect = 1f;
+    [SerializeField] private float minSlopeAngleToAffect = 1f;
 
     [Header("Debug")]
-    public bool showSuspensionRays = true;
-    public bool showSurfaceNormals = true;
-    public Color driveableColor = Color.green;
-    public Color steepColor = Color.red;
-    public float debugSphereSize = 0.08f;
+    [SerializeField] private bool showSuspensionRays = true;
+    [SerializeField] private bool showSurfaceNormals = true;
+    [SerializeField] private Color driveableColor = Color.green;
+    [SerializeField] private Color steepColor = Color.red;
+    [SerializeField] private float debugSphereSize = 0.08f;
 
     // ---------------- Vehicle physical parameters (user inputs) ----------------
     [Header("Vehicle Dimensions & Mass")]
     [Tooltip("Vehicle mass in kilograms.")]
-    public float vehicleMass = 1200f;
+    [SerializeField] private float vehicleMass = 1200f;
     [Tooltip("Distance between front and rear axle (meters).")]
-    public float wheelBase = 2.6f;
+    [SerializeField] private float wheelBase = 2.6f;
     [Tooltip("Vehicle width (track) in meters.")]
-    public float trackWidth = 1.6f;
+    [SerializeField] private float trackWidth = 1.6f;
     [Tooltip("Height of center of mass above the ground in meters (positive).")]
-    public float comHeight = 0.5f;
+    [SerializeField] private float comHeight = 0.5f;
     [Range(0.0f, 1.0f), Tooltip("Fraction of weight on front axle (0..1). 0.5 = even split.")]
-    public float frontWeightRatio = 0.5f;
+    [SerializeField] private float frontWeightRatio = 0.5f;
 
     [Tooltip("When true the script will compute sensible defaults (suspension, grip, rolling resistance, brakes) from the vehicle mass/dimensions.")]
-    public bool autoCalculatePhysics = true;
+    [SerializeField] private bool autoCalculatePhysics = true;
 
     [Header("Auto-Calc Scale Knobs")]
     [Tooltip("Multiplier applied to computed suspension stiffness (use to bias soft/stiff feel).")]
-    public float suspensionStiffnessScale = 3.0f;
+    [SerializeField] private float suspensionStiffnessScale = 3.0f;
     [Tooltip("Multiplier applied to computed suspension damping.")]
-    public float suspensionDampingScale = 1.0f;
+    [SerializeField] private float suspensionDampingScale = 1.0f;
     [Tooltip("Global scale on computed tire grip.")]
-    public float gripScale = 1.0f;
+    [SerializeField] private float gripScale = 1.0f;
     [Tooltip("Global scale on rolling/brake numbers.")]
-    public float rollingResistanceScale = 1.0f;
+    [SerializeField] private float rollingResistanceScale = 1.0f;
 
     // internals
     private Rigidbody rb;
@@ -353,7 +368,10 @@ public class CarController : MonoBehaviour
         {
             // lateral force to push car sideways
             Vector3 driftDir = transform.right * Mathf.Sign(moveInput.x);
-            rb.AddForce(driftDir * driftSideForce * Time.fixedDeltaTime, ForceMode.Acceleration);
+            float speedRatio = Mathf.Clamp01(speed / Mathf.Max(0.0001f, maxSpeed));
+            float lowSpeedAssist = 1f - speedRatio;
+            float sideForceMultiplier = Mathf.Lerp(1f, lowSpeedDriftSideForceMultiplier, lowSpeedAssist);
+            rb.AddForce(driftDir * driftSideForce * sideForceMultiplier * Time.fixedDeltaTime, ForceMode.Acceleration);
 
             // pivot logic based on front/rear lateral velocities
             float frontLat = GetAverageLateralVelocity(true);
@@ -364,10 +382,12 @@ public class CarController : MonoBehaviour
             float pivotDistance = Mathf.Lerp(-rearPivotDistance, frontPivotDistance, pivotT);
 
             float speedFactor = Mathf.Clamp01(rb.linearVelocity.magnitude / Mathf.Max(0.1f, maxSpeed));
-            float yawAmount = moveInput.x * driftYawTorque * (1f + Mathf.Abs(pivotDistance) / (Mathf.Max(frontPivotDistance, rearPivotDistance) + 0.001f)) * speedFactor;
+            speedFactor = Mathf.Max(minDriftYawFactor, speedFactor);
+            float yawAmount = moveInput.x * driftYawTorque * driftYawTorqueMultiplier * (1f + Mathf.Abs(pivotDistance) / (Mathf.Max(frontPivotDistance, rearPivotDistance) + 0.001f)) * speedFactor;
             rb.AddTorque(Vector3.up * yawAmount * Time.fixedDeltaTime, ForceMode.Acceleration);
 
             // charge drift boost
+            driftTimer += Time.fixedDeltaTime;
             if (driftChargeTime <= 0f) driftCharge = 1f;
             else
             {
@@ -378,10 +398,14 @@ public class CarController : MonoBehaviour
 
         if (wasDriftingLocal && !isDrifting)
         {
-            boostActive = true;
-            boostTimer = driftBoostDuration;
-            driftBoostAmount = maxDriftBoost * driftCharge;
+            if (driftTimer >= driftChargeTime && driftCharge > 0f)
+            {
+                boostActive = true;
+                boostTimer = driftBoostDuration;
+                driftBoostAmount = maxDriftBoost * driftCharge;
+            }
             driftCharge = 0f;
+            driftTimer = 0f;
         }
 
         if (!isDrifting)
@@ -437,7 +461,9 @@ public class CarController : MonoBehaviour
         airDashUsed = true;
         airDashTimer = airDashCooldown;
         Vector3 vel = rb.linearVelocity;
-        vel = new Vector3(0f, Mathf.Max(vel.y, 0f), 0f);
+        float forwardSpeed = Vector3.Dot(vel, transform.forward);
+        Vector3 carriedForward = transform.forward * Mathf.Max(0f, forwardSpeed) * airDashForwardCarry;
+        vel = new Vector3(carriedForward.x, Mathf.Max(vel.y, 0f), carriedForward.z);
         rb.linearVelocity = vel;
         rb.AddForce(transform.forward * airDashForce + Vector3.up * airDashUpForce, ForceMode.VelocityChange);
     }
@@ -516,6 +542,11 @@ public class CarController : MonoBehaviour
                 // legacy speed falloff factor (keeps quick tweak available)
                 float legacyFalloff = 1f / (1f + (rb.linearVelocity.magnitude * tireGripSpeedFalloff));
                 grip *= legacyFalloff;
+                if (isDrifting)
+                {
+                    grip *= driftLateralGripMultiplier;
+                    grip *= isFront ? driftFrontGripMultiplier : driftRearGripMultiplier;
+                }
 
                 float lateralForce = -lateralVel * grip;
                 rb.AddForceAtPosition(lateralDir * lateralForce, wheel.position, ForceMode.Acceleration);
@@ -694,3 +725,4 @@ public class CarController : MonoBehaviour
         }
     }
 }
+
