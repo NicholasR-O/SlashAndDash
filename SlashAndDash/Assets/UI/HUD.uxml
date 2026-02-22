@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ui="UnityEngine.UIElements"
+    xmlns:uie="UnityEditor.UIElements"
+    xsi:noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd"
+>
+    <Style src="project://database/Assets/UI/HUDStyleSheet.uss?fileID=7433441132597879392&amp;guid=4d50dd9cdcbf42dc975df35f4e4f87f8&amp;type=3#HUDStyleSheet" />
+    <ui:VisualElement name="hud-root" class="hud-root">
+        <ui:VisualElement class="hud-panel">
+            <ui:Label text="HUD" class="hud-title" />
+
+            <ui:VisualElement class="hud-row">
+                <ui:Label text="Speed" class="hud-label" />
+                <ui:ProgressBar name="speed-bar" title="" class="hud-bar speed-bar" />
+                <ui:Label name="speed-value" text="0.0" class="hud-value" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="hud-row">
+                <ui:Label text="HP" class="hud-label" />
+                <ui:ProgressBar name="hp-bar" title="" class="hud-bar hp-bar" />
+                <ui:Label name="hp-value" text="100%" class="hud-value" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="hud-row">
+                <ui:Label text="Boost" class="hud-label" />
+                <ui:ProgressBar name="boost-bar" title="" class="hud-bar boost-bar" />
+                <ui:Label name="boost-value" text="0%" class="hud-value" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

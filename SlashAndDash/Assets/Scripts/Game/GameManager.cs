@@ -1,10 +1,12 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UIElements;
 
 public class GameManager : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private OptionsMenuScript optionsMenu;
+    [SerializeField] private UIDocument hudDocument;
 
     [Header("Pause Behavior")]
     [SerializeField] private bool lockCursorWhenPlaying = true;
@@ -21,8 +23,9 @@ public class GameManager : MonoBehaviour
     {
         if (optionsMenu == null)
             optionsMenu = FindFirstObjectByType<OptionsMenuScript>();
+        ResolveHudDocumentIfNeeded();
 
-        ApplyPauseState(GameState.IsPaused);
+        ApplyGameState(GameState.Current);
 
         if (optionsMenu == null)
             Debug.LogWarning("[GameManager] OptionsMenuScript reference is missing.");
@@ -63,25 +66,67 @@ public class GameManager : MonoBehaviour
         if (!context.performed)
             return;
 
+        if (GameState.IsGameOver)
+            return;
+
         GameState.TogglePause();
     }
 
     private void OnGameStateChanged(GameState.State state)
     {
-        ApplyPauseState(state == GameState.State.Paused);
+        ApplyGameState(state);
     }
 
-    private void ApplyPauseState(bool paused)
+    private void ApplyGameState(GameState.State state)
     {
+        bool paused = state == GameState.State.Paused;
+        bool gameOver = state == GameState.State.GameOver;
+        bool blockGameplay = paused || gameOver;
+
         if (pauseTimeScale)
-            Time.timeScale = paused ? 0f : 1f;
+            Time.timeScale = blockGameplay ? 0f : 1f;
 
         if (optionsMenu != null)
             optionsMenu.SetVisible(paused);
+        SetHudVisible(state == GameState.State.Playing);
 
-        Cursor.visible = paused;
-        Cursor.lockState = paused
+        UnityEngine.Cursor.visible = blockGameplay;
+        UnityEngine.Cursor.lockState = blockGameplay
             ? CursorLockMode.None
             : (lockCursorWhenPlaying ? CursorLockMode.Locked : CursorLockMode.None);
+    }
+
+    private void SetHudVisible(bool visible)
+    {
+        ResolveHudDocumentIfNeeded();
+
+        if (hudDocument == null || hudDocument.rootVisualElement == null)
+            return;
+
+        VisualElement hudRoot = hudDocument.rootVisualElement.Q<VisualElement>("hud-root");
+        if (hudRoot == null)
+            return;
+
+        hudRoot.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+    }
+
+    private void ResolveHudDocumentIfNeeded()
+    {
+        if (hudDocument != null)
+            return;
+
+        UIDocument[] documents = FindObjectsByType<UIDocument>(FindObjectsSortMode.None);
+        for (int i = 0; i < documents.Length; i++)
+        {
+            UIDocument doc = documents[i];
+            if (doc == null || doc.rootVisualElement == null)
+                continue;
+
+            if (doc.rootVisualElement.Q<VisualElement>("hud-root") != null)
+            {
+                hudDocument = doc;
+                return;
+            }
+        }
     }
 }
