@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 
 public class GameManager : MonoBehaviour
@@ -12,7 +13,12 @@ public class GameManager : MonoBehaviour
     [SerializeField] private bool lockCursorWhenPlaying = true;
     [SerializeField] private bool pauseTimeScale = true;
 
+    [Header("Game Over")]
+    [SerializeField] private bool reloadSceneOnGameOver = true;
+    [SerializeField] private float gameOverReloadDelaySeconds = 1.4f;
+
     private MenuInputActions menuInputActions;
+    private Coroutine gameOverReloadRoutine;
 
     private void Awake()
     {
@@ -39,22 +45,27 @@ public class GameManager : MonoBehaviour
             menuInputActions = new MenuInputActions();
 
         menuInputActions.PauseMenu.Pause.performed += OnPausePerformed;
+        menuInputActions.PauseMenu.Debug.performed += OnDebugPerformed;
         menuInputActions.PauseMenu.Enable();
     }
 
     private void OnDisable()
     {
         GameState.StateChanged -= OnGameStateChanged;
+        StopGameOverReloadRoutine();
 
         if (menuInputActions != null)
         {
             menuInputActions.PauseMenu.Pause.performed -= OnPausePerformed;
+            menuInputActions.PauseMenu.Debug.performed -= OnDebugPerformed;
             menuInputActions.PauseMenu.Disable();
         }
     }
 
     private void OnDestroy()
     {
+        StopGameOverReloadRoutine();
+
         if (pauseTimeScale)
             Time.timeScale = 1f;
 
@@ -69,7 +80,24 @@ public class GameManager : MonoBehaviour
         if (GameState.IsGameOver)
             return;
 
+        if (GameState.IsDebugMenuOpen)
+        {
+            GameState.SetPaused(true);
+            return;
+        }
+
         GameState.TogglePause();
+    }
+
+    private void OnDebugPerformed(InputAction.CallbackContext context)
+    {
+        if (!context.performed)
+            return;
+
+        if (GameState.IsGameOver)
+            return;
+
+        GameState.ToggleDebugMenu();
     }
 
     private void OnGameStateChanged(GameState.State state)
@@ -80,15 +108,21 @@ public class GameManager : MonoBehaviour
     private void ApplyGameState(GameState.State state)
     {
         bool paused = state == GameState.State.Paused;
+        bool debugMenu = state == GameState.State.DebugMenu;
         bool gameOver = state == GameState.State.GameOver;
-        bool blockGameplay = paused || gameOver;
+        bool blockGameplay = paused || debugMenu || gameOver;
 
         if (pauseTimeScale)
             Time.timeScale = blockGameplay ? 0f : 1f;
 
         if (optionsMenu != null)
+        {
             optionsMenu.SetVisible(paused);
+            optionsMenu.SetDebugVisible(debugMenu);
+            optionsMenu.SetGameOverVisible(gameOver);
+        }
         SetHudVisible(state == GameState.State.Playing);
+        HandleGameOverReload(gameOver);
 
         UnityEngine.Cursor.visible = blockGameplay;
         UnityEngine.Cursor.lockState = blockGameplay
@@ -128,5 +162,48 @@ public class GameManager : MonoBehaviour
                 return;
             }
         }
+    }
+
+    private void HandleGameOverReload(bool gameOver)
+    {
+        if (!reloadSceneOnGameOver)
+        {
+            StopGameOverReloadRoutine();
+            return;
+        }
+
+        if (!gameOver)
+        {
+            StopGameOverReloadRoutine();
+            return;
+        }
+
+        if (gameOverReloadRoutine == null)
+            gameOverReloadRoutine = StartCoroutine(ReloadSceneAfterDelay());
+    }
+
+    private System.Collections.IEnumerator ReloadSceneAfterDelay()
+    {
+        float delay = Mathf.Max(0f, gameOverReloadDelaySeconds);
+        if (delay > 0f)
+            yield return new WaitForSecondsRealtime(delay);
+
+        if (pauseTimeScale)
+            Time.timeScale = 1f;
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (activeScene.buildIndex >= 0)
+            SceneManager.LoadScene(activeScene.buildIndex);
+        else
+            SceneManager.LoadScene(activeScene.name);
+    }
+
+    private void StopGameOverReloadRoutine()
+    {
+        if (gameOverReloadRoutine == null)
+            return;
+
+        StopCoroutine(gameOverReloadRoutine);
+        gameOverReloadRoutine = null;
     }
 }

@@ -100,17 +100,37 @@ public partial class @MenuInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Debug"",
+                    ""type"": ""Button"",
+                    ""id"": ""c5fed400-7302-403e-9a58-54b15826dc9c"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
                 {
                     ""name"": """",
                     ""id"": ""17002d96-b3bf-488e-b1cc-b46858bb4db3"",
-                    ""path"": ""<Keyboard>/tab"",
+                    ""path"": ""<Keyboard>/escape"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""Pause"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""3c92fb70-91e8-4a12-96c5-d19d993579c3"",
+                    ""path"": ""<Keyboard>/backquote"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Debug"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -122,6 +142,7 @@ public partial class @MenuInputActions: IInputActionCollection2, IDisposable
         // PauseMenu
         m_PauseMenu = asset.FindActionMap("PauseMenu", throwIfNotFound: true);
         m_PauseMenu_Pause = m_PauseMenu.FindAction("Pause", throwIfNotFound: true);
+        m_PauseMenu_Debug = m_PauseMenu.FindAction("Debug", throwIfNotFound: true);
     }
 
     ~@MenuInputActions()
@@ -203,6 +224,7 @@ public partial class @MenuInputActions: IInputActionCollection2, IDisposable
     private readonly InputActionMap m_PauseMenu;
     private List<IPauseMenuActions> m_PauseMenuActionsCallbackInterfaces = new List<IPauseMenuActions>();
     private readonly InputAction m_PauseMenu_Pause;
+    private readonly InputAction m_PauseMenu_Debug;
     /// <summary>
     /// Provides access to input actions defined in input action map "PauseMenu".
     /// </summary>
@@ -218,6 +240,10 @@ public partial class @MenuInputActions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "PauseMenu/Pause".
         /// </summary>
         public InputAction @Pause => m_Wrapper.m_PauseMenu_Pause;
+        /// <summary>
+        /// Provides access to the underlying input action "PauseMenu/Debug".
+        /// </summary>
+        public InputAction @Debug => m_Wrapper.m_PauseMenu_Debug;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -247,6 +273,9 @@ public partial class @MenuInputActions: IInputActionCollection2, IDisposable
             @Pause.started += instance.OnPause;
             @Pause.performed += instance.OnPause;
             @Pause.canceled += instance.OnPause;
+            @Debug.started += instance.OnDebug;
+            @Debug.performed += instance.OnDebug;
+            @Debug.canceled += instance.OnDebug;
         }
 
         /// <summary>
@@ -261,6 +290,9 @@ public partial class @MenuInputActions: IInputActionCollection2, IDisposable
             @Pause.started -= instance.OnPause;
             @Pause.performed -= instance.OnPause;
             @Pause.canceled -= instance.OnPause;
+            @Debug.started -= instance.OnDebug;
+            @Debug.performed -= instance.OnDebug;
+            @Debug.canceled -= instance.OnDebug;
         }
 
         /// <summary>
@@ -308,5 +340,12 @@ public partial class @MenuInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnPause(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Debug" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnDebug(InputAction.CallbackContext context);
     }
 }

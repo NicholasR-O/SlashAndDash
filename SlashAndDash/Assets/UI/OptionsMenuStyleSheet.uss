@@ -85,3 +85,63 @@
     font-size: 14px;
     -unity-text-align: middle-right;
 }
+
+.debug-toggle {
+    margin-top: 6px;
+    margin-bottom: 6px;
+    color: rgb(225, 232, 241);
+    font-size: 15px;
+}
+
+.quit-button {
+    margin-top: 16px;
+    align-self: flex-end;
+    min-width: 110px;
+}
+
+.game-over-root {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(7, 2, 3, 0.76);
+}
+
+.game-over-panel {
+    min-width: 320px;
+    max-width: 90%;
+    padding-top: 20px;
+    padding-right: 24px;
+    padding-bottom: 20px;
+    padding-left: 24px;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgba(255, 122, 122, 0.4);
+    border-right-color: rgba(255, 122, 122, 0.4);
+    border-bottom-color: rgba(255, 122, 122, 0.4);
+    border-left-color: rgba(255, 122, 122, 0.4);
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-right-radius: 14px;
+    border-bottom-left-radius: 14px;
+    background-color: rgba(24, 8, 12, 0.92);
+    align-items: center;
+}
+
+.game-over-title {
+    color: rgb(255, 173, 173);
+    font-size: 42px;
+    -unity-font-style: bold;
+    letter-spacing: 2px;
+}
+
+.game-over-subtitle {
+    margin-top: 8px;
+    color: rgba(255, 226, 226, 0.92);
+    font-size: 16px;
+}

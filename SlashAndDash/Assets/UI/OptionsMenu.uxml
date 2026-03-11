@@ -14,6 +14,24 @@
                 <ui:Slider name="sensitivity-slider" class="sensitivity-slider" />
                 <ui:Label name="sensitivity-value" text="1.00" class="option-value" />
             </ui:VisualElement>
+            <ui:Button name="quit-button" text="Quit" class="quit-button" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="debug-root" class="options-root">
+        <ui:VisualElement name="debug-panel" class="options-panel">
+            <ui:Label text="Debug" class="options-title" />
+            <ui:Toggle name="debug-god-mode-toggle" text="God Mode" class="debug-toggle" />
+            <ui:Toggle name="debug-no-clip-toggle" text="No-Clip" class="debug-toggle" />
+            <ui:Toggle name="debug-disable-ai-toggle" text="Disable AI" class="debug-toggle" />
+            <ui:Toggle name="debug-show-suspension-toggle" text="Show Suspension Rays" class="debug-toggle" />
+            <ui:Toggle name="debug-show-normals-toggle" text="Show Surface Normals" class="debug-toggle" />
+            <ui:Toggle name="debug-always-boost-toggle" text="Always Boost" class="debug-toggle" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="game-over-root" class="game-over-root">
+        <ui:VisualElement class="game-over-panel">
+            <ui:Label text="GAME OVER" class="game-over-title" />
+            <ui:Label text="Rebooting run..." class="game-over-subtitle" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

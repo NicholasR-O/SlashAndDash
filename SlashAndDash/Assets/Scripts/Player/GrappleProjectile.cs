@@ -14,6 +14,9 @@ public class GrappleProjectile : MonoBehaviour
     Vector3 fireDirection;
     Vector3 startPosition;
     Rigidbody attachedEnemy;
+    Collider projectileCollider;
+    LayerMask enemyMask;
+    Collider[] heldEnemyColliders;
 
     enum State { Flying, Returning, HoldingEnemy }
     State state;
@@ -26,13 +29,18 @@ public class GrappleProjectile : MonoBehaviour
         controller = owner;
         fireDirection = direction.normalized;
         startPosition = transform.position;
+        enemyMask = owner != null ? owner.enemyLayerMask : ~0;
 
         rb = GetComponent<Rigidbody>();
+        projectileCollider = GetComponent<Collider>();
         rb.isKinematic = false;
         rb.useGravity = false;
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.linearVelocity = fireDirection * speed;
+
+        if (projectileCollider != null)
+            projectileCollider.isTrigger = true;
 
         state = State.Flying;
     }
@@ -43,6 +51,8 @@ public class GrappleProjectile : MonoBehaviour
         {
             case State.Flying:
                 CheckForwardHit();
+                if (state != State.Flying)
+                    break;
                 CheckRange();
                 break;
 
@@ -61,7 +71,7 @@ public class GrappleProjectile : MonoBehaviour
         float stepDistance = rb.linearVelocity.magnitude * Time.fixedDeltaTime;
 
         if (Physics.SphereCast(transform.position, hitRadius, fireDirection,
-            out RaycastHit hit, stepDistance, ~0, QueryTriggerInteraction.Collide))
+            out RaycastHit hit, stepDistance, enemyMask, QueryTriggerInteraction.Collide))
         {
             HandleHit(hit.collider, hit.rigidbody);
         }
@@ -83,8 +93,6 @@ public class GrappleProjectile : MonoBehaviour
     {
         if (hitRb != null && collider.CompareTag("Enemy"))
             AttachEnemy(hitRb);
-        else
-            BeginReturn();
     }
 
     void CheckRange()
@@ -99,6 +107,7 @@ public class GrappleProjectile : MonoBehaviour
 
         attachedEnemy = enemy;
         Enemy enemyComponent = attachedEnemy.GetComponent<Enemy>();
+        heldEnemyColliders = attachedEnemy.GetComponentsInChildren<Collider>();
 
         // Make sure it's dynamic before modifying velocity
         if (attachedEnemy.isKinematic)
@@ -109,9 +118,12 @@ public class GrappleProjectile : MonoBehaviour
         attachedEnemy.Sleep();
 
         attachedEnemy.isKinematic = true;
+        SetHeldEnemyCollidersEnabled(false);
 
         if (enemyComponent != null)
             enemyComponent.OnCapturedByGrapple();
+        if (controller != null)
+            controller.NotifyEnemyGrappled();
 
         rb.linearVelocity = Vector3.zero;
         rb.isKinematic = true;
@@ -125,8 +137,10 @@ public class GrappleProjectile : MonoBehaviour
 
         Rigidbody released = attachedEnemy;
         released.isKinematic = false;
+        SetHeldEnemyCollidersEnabled(true);
 
         attachedEnemy = null;
+        heldEnemyColliders = null;
         return released;
     }
 
@@ -134,7 +148,8 @@ public class GrappleProjectile : MonoBehaviour
     {
         if (state == State.Returning) return;
 
-        rb.linearVelocity = Vector3.zero;
+        if (rb != null && !rb.isKinematic)
+            rb.linearVelocity = Vector3.zero;
         rb.isKinematic = true;
         state = State.Returning;
     }
@@ -160,7 +175,9 @@ public class GrappleProjectile : MonoBehaviour
 
     void HoldAtCurrentPoint()
     {
-        Transform hold = controller.CurrentHoldPoint;
+        Transform hold = controller != null && controller.carHoldPoint != null
+            ? controller.carHoldPoint
+            : controller.CurrentHoldPoint;
 
         transform.position = hold.position;
         transform.rotation = hold.rotation;
@@ -175,5 +192,16 @@ public class GrappleProjectile : MonoBehaviour
     public void DestroySelf()
     {
         Destroy(gameObject);
+    }
+
+    void SetHeldEnemyCollidersEnabled(bool enabled)
+    {
+        if (heldEnemyColliders == null) return;
+
+        for (int i = 0; i < heldEnemyColliders.Length; i++)
+        {
+            if (heldEnemyColliders[i] != null)
+                heldEnemyColliders[i].enabled = enabled;
+        }
     }
 }

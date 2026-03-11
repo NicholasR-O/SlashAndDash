@@ -15,9 +15,9 @@ MonoBehaviour:
   tagToDetect: Player
   useCurrentStateTargetOnly: 0
   viewDistance: 18
-  viewAngle: 110
+  viewAngle: 180
   rangeMode: 0
-  range: 2
+  range: 20
   horizontalRangeCheck: 1
   targetMask:
     serializedVersion: 2

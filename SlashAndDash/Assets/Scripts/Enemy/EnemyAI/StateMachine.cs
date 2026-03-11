@@ -119,6 +119,8 @@ public class StateMachine : MonoBehaviour
     [SerializeField] bool transitionLock;
 
     EnemyAIState currentState;
+    NavMeshAgent agent;
+    bool aiDisabledLastFrame;
 
     readonly Dictionary<EnemyAIState, EnemyAIState> runtimeStatesByPrefab = new Dictionary<EnemyAIState, EnemyAIState>();
     readonly Dictionary<EnemyAIState, List<EnemyAIExitRule>> runtimeExitRulesByState = new Dictionary<EnemyAIState, List<EnemyAIExitRule>>();
@@ -129,6 +131,7 @@ public class StateMachine : MonoBehaviour
 
     void Awake()
     {
+        agent = GetComponent<NavMeshAgent>();
         BuildRuntimeGraph();
         ValidateRuntimeGraph();
 
@@ -143,6 +146,17 @@ public class StateMachine : MonoBehaviour
 
     void Update()
     {
+        bool disableAI = GameState.DisableAI;
+        if (disableAI != aiDisabledLastFrame)
+        {
+            aiDisabledLastFrame = disableAI;
+            if (agent != null && agent.enabled)
+                agent.isStopped = disableAI;
+        }
+
+        if (disableAI)
+            return;
+
         if (currentState == null)
             return;
 
@@ -154,6 +168,9 @@ public class StateMachine : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (GameState.DisableAI)
+            return;
+
         if (currentState == null)
             return;
 

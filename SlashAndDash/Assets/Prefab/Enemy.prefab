@@ -45,7 +45,7 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7269991486125530781}
   serializedVersion: 4
-  m_Mass: 5
+  m_Mass: 1
   m_Drag: 0
   m_AngularDrag: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
@@ -85,12 +85,16 @@ MonoBehaviour:
   healthBarBackgroundColor: {r: 0, g: 0, b: 0, a: 0.65}
   healthBarFillColor: {r: 0.25, g: 0.95, b: 0.35, a: 1}
   explosionRadius: 4
-  explosionDamage: 50
+  explosionDamage: 25
   explosionDamageMask:
     serializedVersion: 2
     m_Bits: 64
   explosionVFX: {fileID: 0}
   explosionSFX: {fileID: 0}
+  carImpactPhysicsDuration: 0.6
+  carImpactLift: 3
+  carImpactLiftFromStrength: 1.5
+  maxCarImpactLift: 8
 --- !u!135 &7537715056879831802
 SphereCollider:
   m_ObjectHideFlags: 0

@@ -81,18 +81,30 @@ public class ThirdPersonCamera : MonoBehaviour
 
         Vector2 look = lookAction != null ? lookAction.action.ReadValue<Vector2>() * sensitivity : Vector2.zero;
         float dt = Time.unscaledDeltaTime;
+        bool isAiming = GrappleController.IsAimingStatic;
 
         if (look.sqrMagnitude > 0.001f)
             lastLookInputTime = Time.unscaledTime;
 
+        if (grappleController != null)
+            grappleController.HandleTargetSwitchInput(isAiming ? look : Vector2.zero);
+
         bool allowRecentering = (Time.unscaledTime - lastLookInputTime) > recenterDelay;
 
-        // Camera rotation
+        // Camera rotation:
+        // non-aim -> horizontal orbit only (yaw), keep fixed pitch.
+        // aim -> full yaw/pitch camera control.
         yaw += look.x * lookSpeed * 120f * dt;
-        pitch -= look.y * lookSpeed * 120f * dt;
-        pitch = Mathf.Clamp(pitch, fixedPitch, maxAimPitch); // Keep pitch mostly fixed
+        if (isAiming)
+        {
+            pitch -= look.y * lookSpeed * 120f * dt;
+            pitch = Mathf.Clamp(pitch, minAimPitch, maxAimPitch);
+        }
+        else
+        {
+            pitch = Mathf.Lerp(pitch, fixedPitch, autoCenterSpeed * dt * 1.5f);
+        }
 
-        bool isAiming = GrappleController.IsAimingStatic;
         Transform lockedTarget = grappleController != null ? grappleController.LockedTarget : null;
         if (isAiming && lockedTarget != null)
         {
@@ -117,8 +129,10 @@ public class ThirdPersonCamera : MonoBehaviour
             }
         }
 
-        // Zoom
-        currentDistance -= look.y * zoomSpeed * dt;
+        // Zoom:
+        // non-aim uses vertical look for zoom in/out.
+        if (!isAiming)
+            currentDistance -= look.y * zoomSpeed * dt;
         currentDistance = Mathf.Clamp(currentDistance, minDistance, maxDistance);
 
         // Position and rotation

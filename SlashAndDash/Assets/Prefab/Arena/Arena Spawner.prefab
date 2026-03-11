@@ -46,8 +46,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   enemyTypes:
   - enemyPrefab: {fileID: 7269991486125530781, guid: 7c15f3eefc6ae39429f0d8f01901b416, type: 3}
-    totalToSpawn: 24
-    maxAliveAtOnce: 6
+    totalToSpawn: 60
+    maxAliveAtOnce: 20
   spawnInterval: 0.2
   minDistanceFromPlayer: 8
   maxSpawnAttempts: 20

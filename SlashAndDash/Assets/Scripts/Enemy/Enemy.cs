@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
@@ -57,10 +58,17 @@ public class Enemy : MonoBehaviour, IDamageable
     public GameObject explosionVFX;
     public AudioClip explosionSFX;
 
+    [Header("Car Impact")]
+    [SerializeField] float carImpactPhysicsDuration = 0.35f;
+    [SerializeField] float carImpactLift = 1.4f;
+    [SerializeField] float carImpactLiftFromStrength = 0.12f;
+    [SerializeField] float maxCarImpactLift = 4.5f;
+
     Rigidbody rb;
     NavMeshAgent agent;
     StateMachine aiStateMachine;
     bool armed;
+    bool isCapturedByGrapple;
     bool isDead;
     float currentHealth;
     Camera mainCamera;
@@ -68,10 +76,12 @@ public class Enemy : MonoBehaviour, IDamageable
     Transform healthBarFillTransform;
     SpriteRenderer healthBarBackgroundRenderer;
     SpriteRenderer healthBarFillRenderer;
+    Coroutine carImpactRoutine;
 
     public float MaxHealth => maxHealth;
     public float CurrentHealth => currentHealth;
     public bool IsAlive => !isDead;
+    public bool IsRamDamageImmune => isCapturedByGrapple || armed;
 
     static Sprite solidSprite;
 
@@ -101,6 +111,10 @@ public class Enemy : MonoBehaviour, IDamageable
         currentHealth = Application.isPlaying ? Mathf.Clamp(currentHealth, 0f, maxHealth) : maxHealth;
         explosionRadius = Mathf.Max(0f, explosionRadius);
         explosionDamage = Mathf.Max(0f, explosionDamage);
+        carImpactPhysicsDuration = Mathf.Max(0.01f, carImpactPhysicsDuration);
+        carImpactLift = Mathf.Max(0f, carImpactLift);
+        carImpactLiftFromStrength = Mathf.Max(0f, carImpactLiftFromStrength);
+        maxCarImpactLift = Mathf.Max(carImpactLift, maxCarImpactLift);
         healthBarSize.x = Mathf.Max(0.1f, healthBarSize.x);
         healthBarSize.y = Mathf.Max(0.03f, healthBarSize.y);
     }
@@ -141,6 +155,7 @@ public class Enemy : MonoBehaviour, IDamageable
         if (isDead)
             return;
 
+        isCapturedByGrapple = false;
         armed = true;
         if (aiStateMachine != null)
             aiStateMachine.SetTransitionLock(true);
@@ -155,6 +170,7 @@ public class Enemy : MonoBehaviour, IDamageable
         if (isDead)
             return;
 
+        isCapturedByGrapple = true;
         armed = false;
 
         if (aiStateMachine != null)
@@ -162,6 +178,20 @@ public class Enemy : MonoBehaviour, IDamageable
 
         if (agent != null && agent.enabled)
             agent.enabled = false;
+    }
+
+    public void ApplyCarImpact(Vector3 direction, float strength)
+    {
+        if (isDead || armed || rb == null || strength <= 0f)
+            return;
+
+        if (direction.sqrMagnitude < 0.0001f)
+            return;
+
+        if (carImpactRoutine != null)
+            StopCoroutine(carImpactRoutine);
+
+        carImpactRoutine = StartCoroutine(HandleCarImpact(direction.normalized, strength));
     }
 
     void OnCollisionEnter(Collision collision)
@@ -210,6 +240,8 @@ public class Enemy : MonoBehaviour, IDamageable
         if (explosionVFX != null)
             Instantiate(explosionVFX, pos, Quaternion.identity);
 
+        RuntimeParticleFactory.SpawnEnemyExplosionPulse(pos, explosionRadius);
+
         if (explosionSFX != null)
             AudioSource.PlayClipAtPoint(explosionSFX, pos);
 
@@ -222,6 +254,7 @@ public class Enemy : MonoBehaviour, IDamageable
             return;
 
         isDead = true;
+        isCapturedByGrapple = false;
         armed = false;
 
         if (aiStateMachine != null)
@@ -232,6 +265,41 @@ public class Enemy : MonoBehaviour, IDamageable
 
         if (destroyOnDeath)
             Destroy(gameObject);
+    }
+
+    void OnDisable()
+    {
+        if (carImpactRoutine != null)
+        {
+            StopCoroutine(carImpactRoutine);
+            carImpactRoutine = null;
+        }
+    }
+
+    IEnumerator HandleCarImpact(Vector3 direction, float strength)
+    {
+        bool canRestoreAgent = agent != null && agent.enabled && agent.isOnNavMesh;
+        if (agent != null && agent.enabled)
+        {
+            agent.ResetPath();
+            agent.velocity = Vector3.zero;
+            agent.isStopped = true;
+            agent.enabled = false;
+        }
+
+        rb.isKinematic = false;
+        float lift = carImpactLift + (strength * carImpactLiftFromStrength);
+        lift = Mathf.Min(lift, Mathf.Max(carImpactLift, maxCarImpactLift));
+        Vector3 impulse = direction * strength + Vector3.up * lift;
+        rb.AddForce(impulse, ForceMode.VelocityChange);
+
+        yield return new WaitForSeconds(Mathf.Max(0.01f, carImpactPhysicsDuration));
+
+        if (!isDead && canRestoreAgent && agent != null)
+            agent.enabled = true;
+
+        rb.isKinematic = !isDead && agent != null && agent.enabled;
+        carImpactRoutine = null;
     }
 
     void EnsureHealthBar()
