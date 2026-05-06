@@ -74,14 +74,14 @@ public sealed class TagInViewCondition : EnemyAICondition
         for (int i = 0; i < hitCount; i++)
         {
             Collider col = overlapBuffer[i];
-            if (col == null || !col.CompareTag(tagToDetect))
+            Transform candidate = TargetingUtility.FindTaggedTransform(col, tagToDetect);
+            if (candidate == null)
                 continue;
 
-            Transform candidate = col.attachedRigidbody != null ? col.attachedRigidbody.transform : col.transform;
             if (!IsVisible(origin, candidate))
                 continue;
 
-            Vector3 toCandidate = candidate.position - origin;
+            Vector3 toCandidate = TargetingUtility.GetAimPoint(candidate) - origin;
             float distance = toCandidate.magnitude;
             if (distance < 0.001f)
                 continue;
@@ -105,8 +105,14 @@ public sealed class TagInViewCondition : EnemyAICondition
         if (currentState is ChaseState chaseState)
             return chaseState.Target;
 
+        if (currentState is KeepDistanceState keepDistanceState)
+            return keepDistanceState.Target;
+
         if (currentState is AttackState attackState)
             return attackState.Target;
+
+        if (currentState is ProjectileAttackState projectileAttackState)
+            return projectileAttackState.Target;
 
         return null;
     }
@@ -116,11 +122,7 @@ public sealed class TagInViewCondition : EnemyAICondition
         if (rangeMode == RangeMode.Any)
             return true;
 
-        Vector3 delta = target.position - owner.position;
-        if (horizontalRangeCheck)
-            delta.y = 0f;
-
-        float distance = delta.magnitude;
+        float distance = TargetingUtility.GetColliderDistance(owner, target, horizontalRangeCheck);
         float clampedRange = Mathf.Max(0f, range);
 
         if (rangeMode == RangeMode.InRange)
@@ -134,7 +136,8 @@ public sealed class TagInViewCondition : EnemyAICondition
         if (owner == null || candidate == null)
             return false;
 
-        Vector3 toTarget = candidate.position - origin;
+        Vector3 targetPoint = TargetingUtility.GetAimPoint(candidate);
+        Vector3 toTarget = targetPoint - origin;
         float distance = toTarget.magnitude;
         if (distance < 0.001f || distance > viewDistance)
             return false;
@@ -145,13 +148,7 @@ public sealed class TagInViewCondition : EnemyAICondition
 
         if (Physics.Raycast(origin, direction, out RaycastHit hit, distance, viewBlockMask, QueryTriggerInteraction.Ignore))
         {
-            if (hit.transform == candidate)
-                return true;
-
-            if (hit.rigidbody != null && hit.rigidbody.transform == candidate)
-                return true;
-
-            return false;
+            return TargetingUtility.RaycastHitBelongsTo(hit, candidate);
         }
 
         return true;

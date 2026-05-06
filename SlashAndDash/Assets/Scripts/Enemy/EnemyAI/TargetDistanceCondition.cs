@@ -24,12 +24,8 @@ public sealed class TargetDistanceCondition : EnemyAICondition
         if (target == null)
             return Stay();
 
-        Vector3 delta = target.position - owner.position;
-        if (horizontalOnly)
-            delta.y = 0f;
-
         float threshold = Mathf.Max(0f, distanceThreshold);
-        float distance = delta.magnitude;
+        float distance = TargetingUtility.GetColliderDistance(owner, target, horizontalOnly);
         bool shouldTrigger = triggerWhenWithin ? distance <= threshold : distance > threshold;
 
         if (shouldTrigger)
@@ -43,8 +39,14 @@ public sealed class TargetDistanceCondition : EnemyAICondition
         if (currentState is ChaseState chaseState)
             return chaseState.Target;
 
+        if (currentState is KeepDistanceState keepDistanceState)
+            return keepDistanceState.Target;
+
         if (currentState is AttackState attackState)
             return attackState.Target;
+
+        if (currentState is ProjectileAttackState projectileAttackState)
+            return projectileAttackState.Target;
 
         return null;
     }

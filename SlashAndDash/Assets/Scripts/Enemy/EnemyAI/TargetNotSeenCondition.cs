@@ -25,7 +25,10 @@ public sealed class TargetNotSeenCondition : EnemyAICondition
 
     public override EnemyAIConditionResult Evaluate(EnemyAIState currentState)
     {
-        if (!(currentState is ChaseState) && !(currentState is AttackState))
+        if (!(currentState is ChaseState) &&
+            !(currentState is KeepDistanceState) &&
+            !(currentState is AttackState) &&
+            !(currentState is ProjectileAttackState))
             return Stay();
 
         Transform target = TryGetCurrentStateTarget(currentState);
@@ -52,8 +55,14 @@ public sealed class TargetNotSeenCondition : EnemyAICondition
         if (currentState is ChaseState chaseState)
             return chaseState.Target;
 
+        if (currentState is KeepDistanceState keepDistanceState)
+            return keepDistanceState.Target;
+
         if (currentState is AttackState attackState)
             return attackState.Target;
+
+        if (currentState is ProjectileAttackState projectileAttackState)
+            return projectileAttackState.Target;
 
         return null;
     }
@@ -64,7 +73,7 @@ public sealed class TargetNotSeenCondition : EnemyAICondition
             return false;
 
         Vector3 origin = owner.position + eyeOffset;
-        Vector3 toTarget = candidate.position - origin;
+        Vector3 toTarget = TargetingUtility.GetAimPoint(candidate) - origin;
         float distance = toTarget.magnitude;
         if (distance < 0.001f || distance > viewDistance)
             return false;
@@ -75,13 +84,7 @@ public sealed class TargetNotSeenCondition : EnemyAICondition
 
         if (Physics.Raycast(origin, direction, out RaycastHit hit, distance, viewBlockMask, QueryTriggerInteraction.Ignore))
         {
-            if (hit.transform == candidate)
-                return true;
-
-            if (hit.rigidbody != null && hit.rigidbody.transform == candidate)
-                return true;
-
-            return false;
+            return TargetingUtility.RaycastHitBelongsTo(hit, candidate);
         }
 
         return true;

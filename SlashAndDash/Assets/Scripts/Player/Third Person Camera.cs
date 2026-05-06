@@ -10,11 +10,11 @@ public class ThirdPersonCamera : MonoBehaviour
     public GrappleController grappleController;
 
     [Header("Camera Offset")]
-    public Vector3 baseOffset = new Vector3(0f, 1.8f, -3.5f);
+    public Vector3 baseOffset = new Vector3(0f, 2.05f, -4.6f);
 
     [Header("Zoom")]
-    public float minDistance = 2.5f;
-    public float maxDistance = 6.5f;
+    public float minDistance = 3.2f;
+    public float maxDistance = 8f;
     public float zoomSpeed = 4f;
 
     [Header("Rotation")]
@@ -23,6 +23,9 @@ public class ThirdPersonCamera : MonoBehaviour
     public float minAimPitch = -45f;
     public float maxAimPitch = 60f;
     public float autoCenterSpeed = 3.5f;
+    public float fastAimAssistFullSpeed = 25f;
+    public float fastAimAssistMultiplier = 2.25f;
+    public float fastAimPitchPull = 0.45f;
 
     [Header("Recenter Delay")]
     public float recenterDelay = 0.5f;
@@ -105,6 +108,15 @@ public class ThirdPersonCamera : MonoBehaviour
             pitch = Mathf.Lerp(pitch, fixedPitch, autoCenterSpeed * dt * 1.5f);
         }
 
+        Rigidbody rb = player.GetComponent<Rigidbody>();
+        float speedRatio = 0f;
+        if (rb != null)
+        {
+            Vector3 planarVelocity = rb.linearVelocity;
+            planarVelocity.y = 0f;
+            speedRatio = Mathf.Clamp01(planarVelocity.magnitude / Mathf.Max(0.01f, fastAimAssistFullSpeed));
+        }
+
         Transform lockedTarget = grappleController != null ? grappleController.LockedTarget : null;
         if (isAiming && lockedTarget != null)
         {
@@ -113,19 +125,30 @@ public class ThirdPersonCamera : MonoBehaviour
             if (flat.sqrMagnitude > 0.001f)
             {
                 float targetYaw = Mathf.Atan2(flat.x, flat.z) * Mathf.Rad2Deg;
-                yaw = Mathf.LerpAngle(yaw, targetYaw, autoCenterSpeed * dt * 2.5f);
+                float aimAssistMultiplier = Mathf.Lerp(1f, Mathf.Max(1f, fastAimAssistMultiplier), speedRatio);
+                yaw = Mathf.LerpAngle(yaw, targetYaw, autoCenterSpeed * dt * 2.5f * aimAssistMultiplier);
+
+                if (fastAimPitchPull > 0f && toTarget.sqrMagnitude > 0.001f)
+                {
+                    float targetPitch = -Mathf.Asin(Mathf.Clamp(toTarget.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
+                    targetPitch = Mathf.Clamp(targetPitch, minAimPitch, maxAimPitch);
+                    pitch = Mathf.LerpAngle(
+                        pitch,
+                        targetPitch,
+                        autoCenterSpeed * dt * Mathf.Clamp01(speedRatio * fastAimPitchPull));
+                }
             }
         }
 
         // Auto-center based on player velocity
-        Rigidbody rb = player.GetComponent<Rigidbody>();
         if (rb != null && allowRecentering && !(isAiming && lockedTarget != null))
         {
             Vector3 flatVel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
             if (flatVel.sqrMagnitude > 0.1f)
             {
                 float targetYaw = Mathf.Atan2(flatVel.x, flatVel.z) * Mathf.Rad2Deg;
-                yaw = Mathf.LerpAngle(yaw, targetYaw, autoCenterSpeed * dt);
+                float recenterMultiplier = Mathf.Lerp(1f, Mathf.Max(1f, fastAimAssistMultiplier), speedRatio);
+                yaw = Mathf.LerpAngle(yaw, targetYaw, autoCenterSpeed * dt * recenterMultiplier);
             }
         }
 

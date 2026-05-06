@@ -22,6 +22,9 @@ public class GrappleController : MonoBehaviour
     public float aimTimeScale = 0.35f;
     public float lockAcquireRadius = 20f;
     public float lockMaxAngle = 55f;
+    public float fastTargetingFullSpeed = 25f;
+    public float fastTargetForwardBias = 2f;
+    public float fastTargetVelocityBias = 14f;
 
     [Header("Target Switching")]
     public float targetSwitchInputThreshold = 2.5f;
@@ -61,6 +64,13 @@ public class GrappleController : MonoBehaviour
     public float targetIndicatorConeRadius = 0.18f;
     public float targetIndicatorDistanceFromOrigin = 1.1f;
 
+    [Header("Audio")]
+    [SerializeField] private AudioClip grappleFireSFX;
+    [SerializeField] private float grappleFireVolume = 1f;
+    [SerializeField] private float grappleAudioSpatialBlend = 1f;
+    [SerializeField] private float grappleAudioMinDistance = 1f;
+    [SerializeField] private float grappleAudioMaxDistance = 24f;
+
     public static bool IsAimingStatic { get; private set; }
 
     GrappleProjectile activeProjectile;
@@ -72,6 +82,7 @@ public class GrappleController : MonoBehaviour
     MeshRenderer targetIndicatorRenderer;
     MeshFilter targetIndicatorFilter;
     Material targetIndicatorMaterial;
+    AudioSource grappleAudioSource;
     int lastIndicatorSegmentCount = -1;
     float lastIndicatorConeRadius = -1f;
     float lastIndicatorConeLength = -1f;
@@ -84,15 +95,24 @@ public class GrappleController : MonoBehaviour
     public event Action EnemyGrappled;
     public event Action EnemyThrown;
 
-    public Transform CurrentHoldPoint => IsAimingStatic ? cameraHoldPoint : carHoldPoint;
+    public Transform CurrentHoldPoint => IsAimingStatic
+        ? (cameraHoldPoint != null ? cameraHoldPoint : carHoldPoint)
+        : (carHoldPoint != null ? carHoldPoint : transform);
+
+    void Awake()
+    {
+        ResolveReferenceCache();
+    }
 
     void OnEnable()
     {
+        ResolveReferenceCache();
         aimAction?.action.Enable();
         fireAction?.action.Enable();
         if (fireAction != null)
             fireAction.action.performed += OnFirePerformed;
 
+        EnsureAudioSource();
         EnsureTargetIndicator();
         SetTargetIndicatorVisible(false);
     }
@@ -113,10 +133,29 @@ public class GrappleController : MonoBehaviour
 
     void Update()
     {
+        ResolveReferenceCache();
         HandleAimingState();
         UpdateLockOn();
         UpdateTargetIndicator();
         if (fireTimer > 0f) fireTimer -= Time.unscaledDeltaTime;
+    }
+
+    void ResolveReferenceCache()
+    {
+        if (mainCamera == null)
+            mainCamera = Camera.main;
+
+        if (carRigidbody == null)
+            carRigidbody = GetComponentInParent<Rigidbody>();
+
+        if (carHoldPoint == null)
+            carHoldPoint = transform;
+
+        if (cameraHoldPoint == null && mainCamera != null)
+        {
+            Transform cameraHold = mainCamera.transform.Find("HoldPointCamera");
+            cameraHoldPoint = cameraHold != null ? cameraHold : mainCamera.transform;
+        }
     }
 
     void HandleAimingState()
@@ -153,10 +192,10 @@ public class GrappleController : MonoBehaviour
         Transform heldEnemy = activeProjectile != null ? activeProjectile.HeldEnemyTransform : null;
         float maxRange = GetLockRange(isHoldingEnemy);
 
-        if (IsTargetLockable(lockedTarget, origin, maxRange, heldEnemy))
+        if (IsTargetLockable(lockedTarget, origin, maxRange, heldEnemy, isHoldingEnemy))
             return;
 
-        lockedTarget = FindBestLockTarget(origin, maxRange, heldEnemy);
+        lockedTarget = FindBestLockTarget(origin, maxRange, heldEnemy, isHoldingEnemy);
     }
 
     float GetLockRange(bool isHoldingEnemy)
@@ -165,10 +204,11 @@ public class GrappleController : MonoBehaviour
             return Mathf.Max(0.1f, holdEnemyLockRange);
 
         float grappleRange = grappleProjectilePrefab != null ? grappleProjectilePrefab.maxRange : 0f;
-        return Mathf.Max(grappleRange, lockAcquireRadius);
+        float acquireRange = Mathf.Max(0.1f, lockAcquireRadius);
+        return grappleRange > 0f ? Mathf.Min(grappleRange, acquireRange) : acquireRange;
     }
 
-    Transform FindBestLockTarget(Vector3 origin, float maxRange, Transform excludedTarget)
+    Transform FindBestLockTarget(Vector3 origin, float maxRange, Transform excludedTarget, bool allowUngrappleableTargets)
     {
         Collider[] hits = Physics.OverlapSphere(origin, maxRange, enemyLayerMask, QueryTriggerInteraction.Collide);
         if (hits == null || hits.Length == 0)
@@ -176,6 +216,12 @@ public class GrappleController : MonoBehaviour
 
         HashSet<Transform> seen = new HashSet<Transform>();
         Vector3 cameraForward = mainCamera.transform.forward;
+        Vector3 carVelocity = carRigidbody != null ? carRigidbody.linearVelocity : Vector3.zero;
+        carVelocity.y = 0f;
+        Vector3 carMoveDirection = carVelocity.sqrMagnitude > 0.01f ? carVelocity.normalized : Vector3.zero;
+        float speedRatio = Mathf.Clamp01(carVelocity.magnitude / Mathf.Max(0.01f, fastTargetingFullSpeed));
+        float forwardBias = Mathf.Lerp(10f, 10f * Mathf.Max(1f, fastTargetForwardBias), speedRatio);
+        float velocityBias = Mathf.Max(0f, fastTargetVelocityBias) * speedRatio;
         Transform bestTarget = null;
         float bestScore = float.MinValue;
 
@@ -184,7 +230,7 @@ public class GrappleController : MonoBehaviour
             Transform candidate = GetCandidateTarget(hits[i]);
             if (candidate == null || !seen.Add(candidate))
                 continue;
-            if (!IsTargetLockable(candidate, origin, maxRange, excludedTarget))
+            if (!IsTargetLockable(candidate, origin, maxRange, excludedTarget, allowUngrappleableTargets))
                 continue;
 
             Vector3 toTarget = GetTargetAimPoint(candidate) - origin;
@@ -193,7 +239,11 @@ public class GrappleController : MonoBehaviour
                 continue;
 
             // Prefer nearer targets, with a slight bias toward the camera's forward direction.
-            float score = (Vector3.Dot(cameraForward, toTarget / distance) * 10f) - distance;
+            Vector3 targetDirection = toTarget / distance;
+            float score = (Vector3.Dot(cameraForward, targetDirection) * forwardBias) - distance;
+            if (carMoveDirection.sqrMagnitude > 0.001f)
+                score += Vector3.Dot(carMoveDirection, targetDirection) * velocityBias;
+
             if (score > bestScore)
             {
                 bestScore = score;
@@ -219,11 +269,11 @@ public class GrappleController : MonoBehaviour
         Vector3 origin = hold.position;
         float maxRange = GetLockRange(isHoldingEnemy);
 
-        if (!IsTargetLockable(lockedTarget, origin, maxRange, heldEnemy))
+        if (!IsTargetLockable(lockedTarget, origin, maxRange, heldEnemy, isHoldingEnemy))
             return;
 
         Vector2 inputDir = lookInput.normalized;
-        Transform next = FindDirectionalTarget(origin, maxRange, heldEnemy, inputDir);
+        Transform next = FindDirectionalTarget(origin, maxRange, heldEnemy, inputDir, isHoldingEnemy);
         if (next == null)
             return;
 
@@ -231,7 +281,7 @@ public class GrappleController : MonoBehaviour
         nextTargetSwitchTime = Time.unscaledTime + Mathf.Max(0f, targetSwitchCooldown);
     }
 
-    Transform FindDirectionalTarget(Vector3 origin, float maxRange, Transform excludedTarget, Vector2 inputDir)
+    Transform FindDirectionalTarget(Vector3 origin, float maxRange, Transform excludedTarget, Vector2 inputDir, bool allowUngrappleableTargets)
     {
         Collider[] hits = Physics.OverlapSphere(origin, maxRange, enemyLayerMask, QueryTriggerInteraction.Collide);
         if (hits == null || hits.Length == 0)
@@ -247,7 +297,7 @@ public class GrappleController : MonoBehaviour
             Transform candidate = GetCandidateTarget(hits[i]);
             if (candidate == null || candidate == lockedTarget || !seen.Add(candidate))
                 continue;
-            if (!IsTargetLockable(candidate, origin, maxRange, excludedTarget))
+            if (!IsTargetLockable(candidate, origin, maxRange, excludedTarget, allowUngrappleableTargets))
                 continue;
 
             Vector3 candidateCameraSpace = GetCameraSpaceAimPoint(candidate);
@@ -277,23 +327,20 @@ public class GrappleController : MonoBehaviour
 
     Transform GetCandidateTarget(Collider c)
     {
-        if (c == null)
-            return null;
-
-        Transform candidate = c.attachedRigidbody != null ? c.attachedRigidbody.transform : c.transform;
-        if (candidate == null)
-            return null;
-        if (!candidate.CompareTag("Enemy") && !c.CompareTag("Enemy"))
-            return null;
-
-        return candidate;
+        return TargetingUtility.FindTaggedTransform(c, "Enemy");
     }
 
-    bool IsTargetLockable(Transform candidate, Vector3 origin, float maxRange, Transform excludedTarget)
+    bool IsTargetLockable(Transform candidate, Vector3 origin, float maxRange, Transform excludedTarget, bool allowUngrappleableTargets)
     {
         if (candidate == null || candidate == excludedTarget)
             return false;
         if ((enemyLayerMask.value & (1 << candidate.gameObject.layer)) == 0)
+            return false;
+
+        Enemy enemy = candidate.GetComponent<Enemy>();
+        if (enemy == null || !enemy.IsAlive)
+            return false;
+        if (!allowUngrappleableTargets && !enemy.CanBeGrappled)
             return false;
 
         Vector3 targetPoint = GetTargetAimPoint(candidate);
@@ -302,7 +349,7 @@ public class GrappleController : MonoBehaviour
         if (distance < 0.001f || distance > maxRange)
             return false;
 
-        Collider candidateCollider = candidate.GetComponentInChildren<Collider>();
+        Collider candidateCollider = TargetingUtility.GetBestCollider(candidate);
         if (candidateCollider != null && !HasLineOfSight(origin, candidateCollider, candidate))
             return false;
 
@@ -319,9 +366,7 @@ public class GrappleController : MonoBehaviour
         Vector3 dir = toTarget / distance;
         if (Physics.Raycast(origin, dir, out RaycastHit hit, distance, visibilityMask, QueryTriggerInteraction.Ignore))
         {
-            if (hit.collider == targetCollider) return true;
-            if (hit.rigidbody != null && hit.rigidbody.transform == targetTransform) return true;
-            return false;
+            return hit.collider == targetCollider || TargetingUtility.RaycastHitBelongsTo(hit, targetTransform);
         }
 
         return true;
@@ -355,6 +400,8 @@ public class GrappleController : MonoBehaviour
 
     void OnFirePressed()
     {
+        ResolveReferenceCache();
+
         if (activeProjectile != null && activeProjectile.IsHoldingEnemy)
         {
             LaunchHeldEnemy();
@@ -368,18 +415,22 @@ public class GrappleController : MonoBehaviour
         fireTimer = fireCooldown;
 
         Transform hold = CurrentHoldPoint;
+        if (hold == null)
+            hold = transform;
+
         GrappleProjectile projectile = Instantiate(grappleProjectilePrefab, hold.position, hold.rotation);
-        Vector3 direction = mainCamera.transform.forward;
+        Vector3 direction = mainCamera != null ? mainCamera.transform.forward : hold.forward;
 
         if (lockedTarget != null)
         {
-            Vector3 toTarget = lockedTarget.position - hold.position;
+            Vector3 toTarget = GetTargetAimPoint(lockedTarget) - hold.position;
             if (toTarget.sqrMagnitude > 0.0001f)
                 direction = toTarget.normalized;
         }
 
         projectile.Initialize(this, direction);
         activeProjectile = projectile;
+        PlayGrappleFireAudio();
         FirePerformed?.Invoke();
     }
 
@@ -439,13 +490,7 @@ public class GrappleController : MonoBehaviour
 
     Vector3 GetTargetAimPoint(Transform target)
     {
-        if (target == null) return Vector3.zero;
-
-        Collider c = target.GetComponentInChildren<Collider>();
-        if (c != null)
-            return c.bounds.center;
-
-        return target.position;
+        return TargetingUtility.GetAimPoint(target);
     }
 
     Vector3 GetCameraSpaceAimPoint(Transform target)
@@ -621,5 +666,33 @@ public class GrappleController : MonoBehaviour
         targetIndicatorRenderer.enabled = visible;
         if (!visible)
             targetIndicatorRenderer.transform.SetParent(transform, false);
+    }
+
+    void EnsureAudioSource()
+    {
+        if (grappleAudioSource != null)
+            return;
+
+        grappleAudioSource = AudioPlaybackUtility.EnsureChildAudioSource(
+            transform,
+            "GrappleAudio",
+            loop: false,
+            playOnAwake: false,
+            spatialBlend: grappleAudioSpatialBlend,
+            minDistance: grappleAudioMinDistance,
+            maxDistance: grappleAudioMaxDistance);
+    }
+
+    void PlayGrappleFireAudio()
+    {
+        if (grappleFireSFX == null)
+            return;
+
+        EnsureAudioSource();
+        if (grappleAudioSource == null)
+            return;
+
+        grappleAudioSource.pitch = 1f;
+        grappleAudioSource.PlayOneShot(grappleFireSFX, Mathf.Clamp01(grappleFireVolume));
     }
 }

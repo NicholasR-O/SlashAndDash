@@ -15,6 +15,7 @@ public class GrappleProjectile : MonoBehaviour
     Vector3 startPosition;
     Rigidbody attachedEnemy;
     Collider projectileCollider;
+    Collider[] carColliders;
     LayerMask enemyMask;
     Collider[] heldEnemyColliders;
 
@@ -40,7 +41,13 @@ public class GrappleProjectile : MonoBehaviour
         rb.linearVelocity = fireDirection * speed;
 
         if (projectileCollider != null)
+        {
             projectileCollider.isTrigger = true;
+            IgnoreProjectileCarCollisions(true);
+        }
+
+        CacheCarColliders();
+        IgnoreProjectileCarCollisions(true);
 
         state = State.Flying;
     }
@@ -91,8 +98,15 @@ public class GrappleProjectile : MonoBehaviour
 
     void HandleHit(Collider collider, Rigidbody hitRb)
     {
-        if (hitRb != null && collider.CompareTag("Enemy"))
-            AttachEnemy(hitRb);
+        Enemy enemy = ResolveEnemy(collider, hitRb);
+        if (enemy == null)
+            return;
+
+        Rigidbody enemyBody = enemy.GetComponent<Rigidbody>();
+        if (enemyBody == null)
+            return;
+
+        AttachEnemy(enemyBody, enemy);
     }
 
     void CheckRange()
@@ -101,13 +115,34 @@ public class GrappleProjectile : MonoBehaviour
             BeginReturn();
     }
 
-    void AttachEnemy(Rigidbody enemy)
+    Enemy ResolveEnemy(Collider collider, Rigidbody hitRb)
+    {
+        if (hitRb != null)
+        {
+            Enemy attachedEnemyComponent = hitRb.GetComponent<Enemy>();
+            if (attachedEnemyComponent != null)
+                return attachedEnemyComponent;
+        }
+
+        return collider != null ? collider.GetComponentInParent<Enemy>() : null;
+    }
+
+    void AttachEnemy(Rigidbody enemy, Enemy enemyComponent)
     {
         if (state != State.Flying) return;
 
+        if (enemy == null)
+            return;
+
+        if (enemyComponent != null && !enemyComponent.CanBeGrappled)
+        {
+            BeginReturn();
+            return;
+        }
+
         attachedEnemy = enemy;
-        Enemy enemyComponent = attachedEnemy.GetComponent<Enemy>();
         heldEnemyColliders = attachedEnemy.GetComponentsInChildren<Collider>();
+        IgnoreHeldEnemyCarCollisions(true);
 
         // Make sure it's dynamic before modifying velocity
         if (attachedEnemy.isKinematic)
@@ -136,8 +171,10 @@ public class GrappleProjectile : MonoBehaviour
         if (attachedEnemy == null) return null;
 
         Rigidbody released = attachedEnemy;
+        Collider[] releasedColliders = heldEnemyColliders;
         released.isKinematic = false;
         SetHeldEnemyCollidersEnabled(true);
+        IgnoreCollisionSet(releasedColliders, carColliders, true);
 
         attachedEnemy = null;
         heldEnemyColliders = null;
@@ -194,6 +231,38 @@ public class GrappleProjectile : MonoBehaviour
         Destroy(gameObject);
     }
 
+    void OnDestroy()
+    {
+        IgnoreProjectileCarCollisions(false);
+    }
+
+    void CacheCarColliders()
+    {
+        Rigidbody carRb = controller != null ? controller.carRigidbody : null;
+        if (carRb == null && controller != null)
+            carRb = controller.GetComponentInParent<Rigidbody>();
+
+        carColliders = carRb != null ? carRb.GetComponentsInChildren<Collider>(true) : null;
+    }
+
+    void IgnoreProjectileCarCollisions(bool ignore)
+    {
+        if (projectileCollider == null || carColliders == null)
+            return;
+
+        for (int i = 0; i < carColliders.Length; i++)
+        {
+            Collider carCollider = carColliders[i];
+            if (carCollider != null && carCollider != projectileCollider)
+                Physics.IgnoreCollision(projectileCollider, carCollider, ignore);
+        }
+    }
+
+    void IgnoreHeldEnemyCarCollisions(bool ignore)
+    {
+        IgnoreCollisionSet(heldEnemyColliders, carColliders, ignore);
+    }
+
     void SetHeldEnemyCollidersEnabled(bool enabled)
     {
         if (heldEnemyColliders == null) return;
@@ -202,6 +271,26 @@ public class GrappleProjectile : MonoBehaviour
         {
             if (heldEnemyColliders[i] != null)
                 heldEnemyColliders[i].enabled = enabled;
+        }
+    }
+
+    static void IgnoreCollisionSet(Collider[] first, Collider[] second, bool ignore)
+    {
+        if (first == null || second == null)
+            return;
+
+        for (int i = 0; i < first.Length; i++)
+        {
+            Collider a = first[i];
+            if (a == null)
+                continue;
+
+            for (int j = 0; j < second.Length; j++)
+            {
+                Collider b = second[j];
+                if (b != null && b != a)
+                    Physics.IgnoreCollision(a, b, ignore);
+            }
         }
     }
 }

@@ -1,4 +1,3 @@
-// Full CarController with vehicle-dimension + mass driven auto-calculation
 using Action = System.Action;
 using System.Collections.Generic;
 using UnityEngine;
@@ -8,64 +7,65 @@ using UnityEngine.InputSystem;
 public class CarController : MonoBehaviour, IDamageable
 {
     private const float EffectiveRamMinSpeed = 12f;
+    private const int DefaultWheelCount = 4;
 
     [Header("Movement")]
-    [SerializeField] private float accelerationForce = 1300f;
-    [SerializeField] private float maxSpeed = 22f;
-    [SerializeField] private float turnSpeed = 120f;
+    [SerializeField] private float accelerationForce = 42f;
+    [SerializeField] private float maxSpeed = 32f;
+    [SerializeField] private float turnSpeed = 150f;
+    [SerializeField] private float reverseMaxSpeed = 8f;
+    [SerializeField] private float frontDriveBias = 0.35f;
+    [SerializeField] private float maxSteerAngle = 30f;
+    [SerializeField] private float highSpeedSteerAngle = 14f;
+    [SerializeField] private float steerResponse = 8f;
+    [SerializeField] private float yawAssist = 4.8f;
 
     [Header("Boost")]
-    [SerializeField, HideInInspector] private float driftBoostAmount = 12f; // dynamic on drift end
+    [SerializeField, HideInInspector] private float driftBoostAmount = 12f;
     [SerializeField] private float driftBoostDuration = 1.2f;
     [SerializeField] private int maxBoostStacks = 3;
-    [SerializeField] private float boostSpeedPerStack = 10f;
+    [SerializeField] private float boostSpeedPerStack = 12f;
+    [SerializeField] private float boostImpulsePerStack = 10f;
+    [SerializeField] private float boostAccelerationMultiplier = 1.45f;
     [SerializeField, HideInInspector] private float minBoostStackDuration = 0.2f;
 
     [Header("Jump")]
     [SerializeField] private float jumpForce = 9f;
     [SerializeField] private LayerMask groundLayer;
 
-    [Header("Arcade Stability")]
-    [SerializeField, HideInInspector] private Vector3 centerOfMassOffset = new Vector3(0f, -0.7f, -0.4f);
-    [SerializeField, HideInInspector] private float groundAngularDamping = 10f;
-    [SerializeField, HideInInspector] private float airAngularDamping = 3f;
-    [SerializeField, HideInInspector] private float rampPitchDamping = 0.35f;
-    [SerializeField, HideInInspector] private float groundedDownforce = 35f;
+    [Header("Stability")]
+    [SerializeField, HideInInspector] private Vector3 centerOfMassOffset = new Vector3(0f, 0f, -0.08f);
+    [SerializeField, HideInInspector] private float groundAngularDamping = 2.5f;
+    [SerializeField, HideInInspector] private float airAngularDamping = 0.65f;
+    [SerializeField, HideInInspector] private float rampPitchDamping = 0.9f;
+    [SerializeField, HideInInspector] private float groundedDownforce = 4f;
+    [SerializeField] private float groundUprightStrength = 16f;
+    [SerializeField] private float groundUprightDamping = 3.5f;
+    [SerializeField] private float airUprightStrength = 3.5f;
+    [SerializeField] private float airUprightDamping = 0.9f;
+    [SerializeField] private float antiRollStrength = 6500f;
 
-    [Header("Arcade Gravity")]
-    [SerializeField, HideInInspector] private float airGravityMultiplier = 1.6f;
-    [SerializeField, HideInInspector] private float fallGravityMultiplier = 2.2f;
+    [Header("Gravity / Airtime")]
+    [SerializeField, HideInInspector] private float airGravityMultiplier = 0.85f;
+    [SerializeField, HideInInspector] private float fallGravityMultiplier = 1.15f;
 
-    [Header("Arcade Drift")]
-    [SerializeField, HideInInspector] private float driftSideForce = 2200f;
-    [SerializeField, HideInInspector] private float driftGripRecovery = 3.5f;
+    [Header("Drift")]
+    [SerializeField, HideInInspector] private float driftSideForce = 10f;
+    [SerializeField, HideInInspector] private float driftGripRecovery = 4f;
     [SerializeField] private float minDriftSpeed = 5f;
-    [SerializeField] private float driftSteerMultiplier = 1.45f;
-    [Tooltip("Extra side-force multiplier applied at lower speeds so drift is still noticeable.")]
-    [SerializeField, HideInInspector] private float lowSpeedDriftSideForceMultiplier = 1.6f;
-    [Tooltip("Minimum yaw factor while drifting so low-speed drift rotation remains visible.")]
-    [SerializeField, HideInInspector] private float minDriftYawFactor = 0.35f;
-    [Tooltip("Overall lateral tire grip multiplier while drifting (<1 = more slide).")]
-    [SerializeField, HideInInspector] private float driftLateralGripMultiplier = 0.6f;
-    [Tooltip("Front wheel lateral grip multiplier while drifting.")]
-    [SerializeField, HideInInspector] private float driftFrontGripMultiplier = 0.8f;
-    [Tooltip("Rear wheel lateral grip multiplier while drifting.")]
-    [SerializeField, HideInInspector] private float driftRearGripMultiplier = 0.5f;
-    [Tooltip("Extra yaw torque multiplier while drifting to take larger turns.")]
-    [SerializeField, HideInInspector] private float driftYawTorqueMultiplier = 1.35f;
-
-    [Tooltip("Seconds of continuous drifting required before drift boost can trigger.")]
+    [SerializeField] private float driftSteerMultiplier = 1.05f;
+    [SerializeField, HideInInspector] private float lowSpeedDriftSideForceMultiplier = 1.15f;
+    [SerializeField, HideInInspector] private float minDriftYawFactor = 0.2f;
+    [SerializeField, HideInInspector] private float driftLateralGripMultiplier = 0.95f;
+    [SerializeField, HideInInspector] private float driftFrontGripMultiplier = 1f;
+    [SerializeField, HideInInspector] private float driftRearGripMultiplier = 0.65f;
+    [SerializeField, HideInInspector] private float driftYawTorqueMultiplier = 0.9f;
     [SerializeField] private float driftChargeTime = 1f;
     [SerializeField] private float maxDriftBoost = 12f;
 
-    [Header("Drift Pivoting (front vs rear balance)")]
-    [SerializeField, HideInInspector] private float frontPivotDistance = 3.0f;
-    [SerializeField, HideInInspector] private float rearPivotDistance = 2.0f;
-    [SerializeField, HideInInspector] private float driftYawTorque = 80f;
-    [SerializeField, HideInInspector] private float lateralSlipThreshold = 2.0f;
-
-    private float driftCharge = 0f;
-    private float driftTimer = 0f;
+    [Header("Legacy Drift Tuning")]
+    [SerializeField, HideInInspector] private float driftYawTorque = 4.5f;
+    [SerializeField, HideInInspector] private float lateralSlipThreshold = 3.5f;
 
     [Header("Runtime Particles")]
     [SerializeField] private bool enableRuntimeParticles = true;
@@ -76,101 +76,128 @@ public class CarController : MonoBehaviour, IDamageable
     [SerializeField] private Color drivingDustColor = new Color(0.78f, 0.73f, 0.64f, 0.62f);
     [SerializeField] private Color boostDustColor = new Color(1f, 0.83f, 0.3f, 0.72f);
 
+    [Header("Audio")]
+    [SerializeField] private AudioClip boostEnterSFX;
+    [SerializeField] private float boostEnterVolume = 1f;
+    [SerializeField] private AudioClip dashSFX;
+    [SerializeField] private float dashVolume = 1f;
+    [SerializeField] private AudioClip engineIdleLoopSFX;
+    [SerializeField] private float engineIdleVolume = 0.65f;
+    [SerializeField] private float engineIdlePitch = 1f;
+    [SerializeField] private AudioClip engineLoopSFX;
+    [SerializeField] private float engineLoopVolume = 0.9f;
+    [SerializeField] private float engineMinPitch = 0.8f;
+    [SerializeField] private float engineMaxPitch = 1.5f;
+    [SerializeField] private float engineRunningFullVolumeSpeed = 7f;
+    [SerializeField] private float engineAudioFadeSpeed = 6f;
+    [SerializeField] private AudioClip jumpSFX;
+    [SerializeField] private float jumpVolume = 1f;
+    [SerializeField] private AudioClip terrainThumpSFX;
+    [SerializeField] private float terrainThumpVolume = 1f;
+    [SerializeField] private float terrainCollisionSoundFullVolumeImpact = 22f;
+    [SerializeField] private float terrainCollisionSoundMinVolumeScale = 0.35f;
+    [SerializeField] private float terrainCollisionSoundMaxVolumeScale = 2f;
+    [SerializeField] private AudioClip wheelRollingLoopSFX;
+    [SerializeField] private float wheelRollingVolume = 0.8f;
+    [SerializeField] private float wheelRollingMinSpeed = 1.5f;
+    [SerializeField] private float wheelRollingMinPitch = 0.8f;
+    [SerializeField] private float wheelRollingMaxPitch = 1.3f;
+    [SerializeField] private float audioSpatialBlend = 1f;
+    [SerializeField] private float audioMinDistance = 1f;
+    [SerializeField] private float audioMaxDistance = 24f;
+    [SerializeField] private float engineInputThreshold = 0.05f;
+    [SerializeField] private float terrainCollisionSoundMinImpact = 4f;
+    [SerializeField] private float terrainCollisionSoundCooldown = 0.18f;
+
     [Header("Air Dash")]
     [SerializeField] private float airDashForce = 28f;
     [SerializeField, HideInInspector] private float airDashUpForce = 4f;
     [SerializeField, HideInInspector] private float airDashCooldown = 0.15f;
-    [Tooltip("How much existing forward velocity is carried into the air dash.")]
     [SerializeField, HideInInspector] private float airDashForwardCarry = 0.35f;
 
-    [Header("Fake Wheels / Suspension")]
-    [Tooltip("Wheel contact transforms (any order). Place near contact point bottom of each corner).")]
+    [Header("Suspension Geometry")]
+    [Tooltip("Stable wheel rest positions in the player's local space. These do not depend on collider size.")]
+    [SerializeField] private Vector3[] wheelLocalPositions =
+    {
+        new Vector3(-0.9f, 0.01f, 1.6f),
+        new Vector3(0.96f, 0.01f, 1.6f),
+        new Vector3(-0.9f, 0.01f, -1.619f),
+        new Vector3(0.96f, 0.01f, -1.62f)
+    };
+    [Tooltip("Optional legacy/reference wheel transforms. Physics only uses them as a fallback if local wheel points are missing.")]
     [SerializeField] private Transform[] wheelTransforms;
-    [Tooltip("Distance above wheel used as the ray origin; ray length = suspensionDistance * 2")]
-    [SerializeField] private float suspensionDistance = 0.5f;
-    [Tooltip("Spring stiffness. Large numbers ok — we're using ForceMode.Acceleration.")]
-    [SerializeField, HideInInspector] private float suspensionStiffness = 20000f;
-    [Tooltip("Suspension damper; reduces oscillation.")]
-    [SerializeField, HideInInspector] private float suspensionDamping = 500f;
-    [Tooltip("Clamps per-wheel suspension force.")]
-    [SerializeField, HideInInspector] private float suspensionMaxForcePerWheel = 20000f;
 
-    [Header("Tire Grip (speed-dependent)")]
-    [Tooltip("Base lateral grip per wheel (higher = less sliding).")]
-    [SerializeField, HideInInspector] private float tireGrip = 60f;
-    [Tooltip("Curve that maps speed ratio (0..1) to grip multiplier. X= speed ratio, Y = multiplier.")]
-    [SerializeField, HideInInspector] private AnimationCurve gripCurve = AnimationCurve.Linear(0f, 1f, 1f, 0.4f);
-    [Tooltip("Front/rear multipliers applied to base tireGrip (1 = same as base).")]
-    [SerializeField, HideInInspector] private float frontTireGrip = 1f;
+    [Header("Suspension Tuning")]
+    [Tooltip("Spring rest length from the wheel anchor to the wheel center.")]
+    [SerializeField] private float suspensionDistance = 0.9f;
+    [Tooltip("Spring force per meter of compression.")]
+    [SerializeField] private float suspensionStiffness = 32000f;
+    [Tooltip("Damping applied along the spring direction.")]
+    [SerializeField] private float suspensionDamping = 4500f;
+    [Tooltip("Maximum upward force a single wheel spring can apply.")]
+    [SerializeField] private float suspensionMaxForcePerWheel = 22000f;
+    [Tooltip("0 uses car up for spring force, 1 uses ground normal.")]
+    [SerializeField] private float suspensionNormalBlend = 0.65f;
+    [Tooltip("Extra ray length below the wheel so suspension probes visibly reach past the car bottom.")]
+    [SerializeField] private float suspensionProbeSlack = 0.25f;
+
+    [Header("Wheel Visuals")]
+    [SerializeField] private Transform[] wheelVisuals;
+    [SerializeField] private float wheelVisualRadius = 0.47f;
+    [SerializeField] private Vector3 wheelSpinAxis = Vector3.right;
+    [SerializeField] private float wheelSpinSpeedMultiplier = 1f;
+    [SerializeField] private bool spinOnlyWhenGrounded = true;
+
+    [Header("Tires")]
+    [SerializeField, HideInInspector] private float tireGrip = 28f;
+    [SerializeField, HideInInspector] private AnimationCurve gripCurve = AnimationCurve.Linear(0f, 1f, 1f, 0.65f);
+    [SerializeField, HideInInspector] private float frontTireGrip = 1.05f;
     [SerializeField, HideInInspector] private float rearTireGrip = 1f;
-    [Tooltip("Grip falls off additionally with forward speed multiplier (legacy multiplier kept for quick tuning).")]
-    [SerializeField, HideInInspector] private float tireGripSpeedFalloff = 0.6f;
+    [SerializeField, HideInInspector] private float tireGripSpeedFalloff = 0.2f;
+    [SerializeField] private float maxLateralAcceleration = 42f;
 
-    [Header("Rolling Resistance / Braking (front/rear)")]
-    [Tooltip("Longitudinal rolling resistance (front wheels).")]
-    [SerializeField, HideInInspector] private float frontRollingResistance = 18f;
-    [Tooltip("Longitudinal rolling resistance (rear wheels).")]
-    [SerializeField, HideInInspector] private float rearRollingResistance = 18f;
-    [Tooltip("Coast drag applied per-wheel when player is not giving throttle (front).")]
-    [SerializeField, HideInInspector] private float frontCoastDrag = 20f;
-    [Tooltip("Coast drag applied per-wheel when player is not giving throttle (rear).")]
-    [SerializeField, HideInInspector] private float rearCoastDrag = 20f;
-    [Tooltip("Braking force applied per-wheel when the player pulls negative throttle (brake/reverse).")]
-    [SerializeField, HideInInspector] private float brakeForce = 80f;
-    [Tooltip("Multiplier applied to rear rolling resistance while drifting; <1 reduces rear resistance to help maintain slide.")]
+    [Header("Rolling Resistance / Braking")]
+    [SerializeField, HideInInspector] private float frontRollingResistance = 0.45f;
+    [SerializeField, HideInInspector] private float rearRollingResistance = 0.38f;
+    [SerializeField, HideInInspector] private float frontCoastDrag = 0.55f;
+    [SerializeField, HideInInspector] private float rearCoastDrag = 0.45f;
+    [SerializeField, HideInInspector] private float brakeForce = 38f;
     [SerializeField, HideInInspector] private float driftRearRollingResistanceMultiplier = 0.45f;
 
     [Header("Hill / Slope")]
-    [Tooltip("How much extra acceleration you get when going downhill (units of ForceMode.Acceleration). Set to 0 to disable.")]
-    [SerializeField, HideInInspector] private float downhillAcceleration = 12f;
-
-    [Header("Slope Limits")]
-    [Tooltip("Maximum slope angle (deg) car can drive up. Set >= 45 for 45° ramps to be climbable.")]
-    [SerializeField] private float maxDriveSlopeAngle = 60f;
-    [SerializeField, HideInInspector] private float steepSlopeSlideForce = 25f;
-
-    [Header("Leave Ground")]
-    [SerializeField, HideInInspector] private float leaveGroundForwardBoost = 0.25f;
-
-    [Header("Slope Sampling")]
-    [Tooltip("How far forwards/back from the car center to sample the ground for slope calculation (meters).")]
-    [SerializeField, HideInInspector] private float slopeSampleDistance = 1.0f;
-    [Tooltip("Ignore very small slopes (degrees) so tiny bumps don't count.")]
+    [SerializeField, HideInInspector] private float downhillAcceleration = 8f;
+    [SerializeField] private float maxDriveSlopeAngle = 72f;
+    [SerializeField, HideInInspector] private float steepSlopeSlideForce = 12f;
+    [SerializeField, HideInInspector] private float leaveGroundForwardBoost = 2f;
+    [SerializeField, HideInInspector] private float leaveGroundUpBoost = 3.5f;
+    [SerializeField, HideInInspector] private float boostLeaveGroundUpBoost = 5.5f;
+    [SerializeField, HideInInspector] private float rampClimbAssist = 9f;
+    [SerializeField, HideInInspector] private float boostRampClimbAssist = 16f;
+    [SerializeField, HideInInspector] private float rampClimbAssistMinSlope = 8f;
+    [SerializeField, HideInInspector] private float slopeSampleDistance = 1f;
     [SerializeField, HideInInspector] private float minSlopeAngleToAffect = 1f;
-
-#if false // Auto-steer temporarily disabled for build stabilization.
-    [Header("Auto Steer Assist")]
-    [Tooltip("Automatically nudges steering away from upcoming non-drivable surfaces.")]
-    [SerializeField] private bool autoSteerEnabled = true;
-    [Tooltip("Assist starts ramping in above this forward speed.")]
-    [SerializeField] private float autoSteerMinSpeed = 10f;
-    [Tooltip("Assist reaches full strength at this forward speed.")]
-    [SerializeField] private float autoSteerFullSpeed = 28f;
-    [Tooltip("Forward probe distance at minimum assist speed.")]
-    [SerializeField] private float autoSteerMinLookAhead = 2.5f;
-    [Tooltip("Forward probe distance at full assist speed.")]
-    [SerializeField] private float autoSteerMaxLookAhead = 8f;
-    [Tooltip("Radius for each forward auto-steer probe.")]
-    [SerializeField] private float autoSteerProbeRadius = 0.45f;
-    [Tooltip("Maximum steering input that auto-steer can add.")]
-    [SerializeField, Range(0f, 1f)] private float autoSteerMaxInput = 0.55f;
-    [Tooltip("How quickly auto-steer input can change.")]
-    [SerializeField] private float autoSteerResponse = 6f;
-    [Tooltip("How many FixedUpdate frames ahead to predict when checking if the car will hit a wall.")]
-    [SerializeField, Min(1)] private int autoSteerPredictionFrames = 8;
-    [Tooltip("If player steer magnitude is above this, auto-steer is disabled.")]
-    [SerializeField, Range(0f, 1f)] private float autoSteerPlayerTurnDeadzone = 0.08f;
-    [Tooltip("Extra climbable slope angle (deg) considered driveable at high speed for auto-steer wall checks.")]
-    [SerializeField, Range(0f, 30f)] private float autoSteerSpeedSlopeBonus = 12f;
-    [Tooltip("Layers considered for auto-steer obstacle probes.")]
-    [SerializeField] private LayerMask autoSteerLayerMask = ~0;
-    [Tooltip("Draw auto-steer prediction and wall-avoidance gizmos while selected.")]
-    [SerializeField] private bool showAutoSteerGizmos = true;
-#endif
 
     [Header("Debug")]
     [SerializeField, HideInInspector] private bool showSuspensionRays = true;
     [SerializeField, HideInInspector] private bool showSurfaceNormals = true;
+    [Tooltip("Draw wheel mount, contact, spring, lateral grip, drive, and rolling resistance gizmos in the Scene view.")]
+    [SerializeField] private bool showWheelPhysicsGizmos = true;
+    [Tooltip("Radius used for wheel wireframe gizmos.")]
+    [SerializeField] private float wheelGizmoRadius = 0.28f;
+    [Tooltip("Scene-view vector scale for per-wheel acceleration/force arrows.")]
+    [SerializeField] private float forceGizmoScale = 0.035f;
+    [Tooltip("Wheel gizmo color when the suspension ray is grounded.")]
+    [SerializeField] private Color wheelContactColor = new Color(0.2f, 0.9f, 1f, 1f);
+    [Tooltip("Wheel gizmo color when the suspension ray is not grounded.")]
+    [SerializeField] private Color wheelAirColor = new Color(0.45f, 0.45f, 0.45f, 1f);
+    [Tooltip("Spring force arrow color.")]
+    [SerializeField] private Color springForceColor = new Color(0.2f, 1f, 0.25f, 1f);
+    [Tooltip("Lateral tire force arrow color.")]
+    [SerializeField] private Color lateralForceColor = new Color(1f, 0.25f, 0.9f, 1f);
+    [Tooltip("Drive/brake force arrow color.")]
+    [SerializeField] private Color driveForceColor = new Color(1f, 0.75f, 0.15f, 1f);
+    [Tooltip("Wheel forward direction arrow color.")]
+    [SerializeField] private Color wheelForwardColor = new Color(0.15f, 0.55f, 1f, 1f);
     [SerializeField, HideInInspector] private Color driveableColor = Color.green;
     [SerializeField, HideInInspector] private Color steepColor = Color.red;
     [SerializeField, HideInInspector] private float debugSphereSize = 0.08f;
@@ -183,16 +210,16 @@ public class CarController : MonoBehaviour, IDamageable
     [SerializeField] private bool enablePassiveRegen = true;
     [SerializeField] private float regenDelaySeconds = 4f;
     [SerializeField] private float regenPerSecond = 8f;
-    [SerializeField, HideInInspector] private bool disableControllerOnDeath = true;
     [SerializeField, HideInInspector] private bool logDamageEvents;
 
-    [Header("Fall Recovery")]
-    [SerializeField] private float freeFallRecoveryDelaySeconds = 1f;
-    [SerializeField] private float freeFallRecoveryDamage = 10f;
+    [Header("Checkpoint Respawn")]
+    [SerializeField] private bool respawnWhenBelowOutOfBoundsY = true;
+    [SerializeField] private float outOfBoundsY = 100f;
+    [SerializeField] private float outOfBoundsRespawnDamage = 10f;
 
     [Header("Airtime Trick")]
     [SerializeField] private bool enableAirtimeTrick = true;
-    [SerializeField] private float trickMinAirTime = 0.45f;
+    [SerializeField] private float trickMinAirTime = 0.8f;
     [SerializeField] private float trickLandingGraceSeconds = 0.25f;
     [SerializeField] private float trickBoostReward = 1f;
     [SerializeField] private float trickCooldownSeconds = 1f;
@@ -213,10 +240,12 @@ public class CarController : MonoBehaviour, IDamageable
     [SerializeField, HideInInspector] private float boostCollisionPushMultiplier = 2.6f;
     [SerializeField, HideInInspector] private float boostCollisionMinPushStrength = 24f;
     [SerializeField, HideInInspector] private float collisionImpactCooldown = 0.2f;
+
     [Header("Boost Wall Bounce")]
     [SerializeField] private float boostWallBounceSpeedScale = 0.35f;
     [SerializeField] private float boostWallBounceMinSpeed = 6f;
     [SerializeField] private float boostWallBounceCooldown = 0.12f;
+
     [Header("Ram Hitbox")]
     [SerializeField] private bool autoCreateRamHitbox = true;
     [SerializeField] private BoxCollider ramHitbox;
@@ -230,33 +259,43 @@ public class CarController : MonoBehaviour, IDamageable
     [SerializeField, HideInInspector] private float nonBoostRamForwardSpeedLossPercent = 0.015f;
     [SerializeField, HideInInspector] private float nonBoostRamForwardSpeedLossMax = 0.75f;
 
-    // ---------------- Vehicle physical parameters (user inputs) ----------------
     [Header("Vehicle Dimensions & Mass")]
-    [Tooltip("Vehicle mass in kilograms.")]
-    [SerializeField] private float vehicleMass = 1200f;
-    [Tooltip("Distance between front and rear axle (meters).")]
-    [SerializeField] private float wheelBase = 2.6f;
-    [Tooltip("Vehicle width (track) in meters.")]
-    [SerializeField] private float trackWidth = 1.6f;
-    [Tooltip("Height of center of mass above the ground in meters (positive).")]
-    [SerializeField] private float comHeight = 0.5f;
-    [Range(0.0f, 1.0f), Tooltip("Fraction of weight on front axle (0..1). 0.5 = even split.")]
-    [SerializeField] private float frontWeightRatio = 0.5f;
+    [SerializeField] private float vehicleMass = 900f;
+    [SerializeField] private float wheelBase = 3.22f;
+    [SerializeField] private float trackWidth = 1.86f;
+    [SerializeField] private float comHeight = 0.55f;
+    [Range(0f, 1f)] [SerializeField] private float frontWeightRatio = 0.52f;
+    [SerializeField] private bool autoCalculatePhysics;
 
-    [Tooltip("When true the script will compute sensible defaults (suspension, grip, rolling resistance, brakes) from the vehicle mass/dimensions.")]
-    [SerializeField] private bool autoCalculatePhysics = true;
+    [Header("Legacy Auto-Calc Scale Knobs")]
+    [SerializeField] private float suspensionStiffnessScale = 1f;
+    [SerializeField] private float suspensionDampingScale = 1f;
+    [SerializeField] private float gripScale = 1f;
+    [SerializeField] private float rollingResistanceScale = 1f;
 
-    [Header("Auto-Calc Scale Knobs")]
-    [Tooltip("Multiplier applied to computed suspension stiffness (use to bias soft/stiff feel).")]
-    [SerializeField] private float suspensionStiffnessScale = 3.0f;
-    [Tooltip("Multiplier applied to computed suspension damping.")]
-    [SerializeField] private float suspensionDampingScale = 1.0f;
-    [Tooltip("Global scale on computed tire grip.")]
-    [SerializeField] private float gripScale = 1.0f;
-    [Tooltip("Global scale on rolling/brake numbers.")]
-    [SerializeField] private float rollingResistanceScale = 1.0f;
+    struct WheelState
+    {
+        public bool grounded;
+        public bool isFront;
+        public bool isLeft;
+        public Vector3 localPosition;
+        public Vector3 wheelWorldPosition;
+        public Vector3 rayOrigin;
+        public Vector3 hitPoint;
+        public Vector3 normal;
+        public Vector3 springDirection;
+        public Vector3 wheelForward;
+        public Vector3 wheelRight;
+        public float compression;
+        public float springLength;
+        public float springForce;
+        public float forwardSpeed;
+        public float lateralSpeed;
+        public float lateralAcceleration;
+        public float driveAcceleration;
+        public float rollingAcceleration;
+    }
 
-    // internals
     private Rigidbody rb;
     private Collider col;
     private PlayerInputActions controls;
@@ -268,47 +307,31 @@ public class CarController : MonoBehaviour, IDamageable
     private bool boostActive;
     private int currentBoostStacks;
     private float boostTimer;
+    private bool maxBoostStackLockout;
+    private float driftCharge;
+    private float driftTimer;
+    private float currentSteerAngle;
 
     private bool airDashUsed;
     private float airDashTimer;
-
     private RaycastHit groundHit;
     private float slopeAngle;
-
-    // slope sample debug
-    private float lastSampledSlopeAngle = 0f;
+    private float lastSampledSlopeAngle;
     private Vector3 lastFrontSample = Vector3.zero;
     private Vector3 lastBackSample = Vector3.zero;
-    private bool lastSampleHadHits = false;
+    private bool lastSampleHadHits;
+
     private readonly Dictionary<int, float> recentEnemyImpactTimeById = new Dictionary<int, float>();
     private float currentHealth;
     private bool isDead;
     private bool noClipActive;
     private bool noClipAscendInput;
     private bool noClipDescendInput;
-#if false // Auto-steer temporarily disabled for build stabilization.
-    private float autoSteerInput;
-    private int autoSteerPerpendicularWallId;
-    private float autoSteerPerpendicularTurnSign = 1f;
-    private readonly RaycastHit[] autoSteerProbeHits = new RaycastHit[16];
-    private bool autoSteerDebugActive;
-    private bool autoSteerDebugSuppressedByPlayer;
-    private bool autoSteerDebugSuppressedBySpeed;
-    private Vector3 autoSteerDebugOrigin;
-    private Vector3 autoSteerDebugDirection;
-    private float autoSteerDebugLookAhead;
-    private bool autoSteerDebugHasWallHit;
-    private Vector3 autoSteerDebugWallPoint;
-    private Vector3 autoSteerDebugWallNormal;
-    private float autoSteerDebugDanger;
-    private float autoSteerDebugSteerSign;
-#endif
     private float regenPausedUntil;
     private bool isRegenerating;
-    private float freeFallStartedAt = -1f;
-    private Vector3 lastGroundedPosition;
-    private Quaternion lastGroundedRotation = Quaternion.identity;
-    private bool hasLastGroundedPose;
+    private Vector3 checkpointRespawnPosition;
+    private Quaternion checkpointRespawnRotation = Quaternion.identity;
+    private bool hasCheckpointRespawnPose;
     private bool trickInAir;
     private bool trickCandidateReady;
     private float trickAirTimer;
@@ -317,11 +340,27 @@ public class CarController : MonoBehaviour, IDamageable
     private float lastTrickSucceededAt = -999f;
     private bool hasPerformedTrickThisLife;
     private int ramImpactCount;
+
     private Transform particleAnchor;
     private ParticleSystem drivingDustParticles;
     private ParticleSystem boostDustParticles;
     private ParticleSystem driftSparkleParticles;
+    private AudioSource vehicleOneShotSource;
+    private AudioSource engineIdleLoopSource;
+    private AudioSource engineLoopSource;
+    private AudioSource wheelRollingLoopSource;
+
+    private WheelState[] wheelStates;
+    private float[] wheelSpinAngles;
+    private Quaternion[] wheelVisualBaseRotations;
+    private Transform[] wheelVisualCacheRefs;
+    private int frontGroundedCount;
+    private int rearGroundedCount;
+    private int groundedWheelCount;
+    private Vector3 averageGroundNormal = Vector3.up;
+
     private float lastBoostWallBounceTime = -999f;
+    private float terrainThumpPlayableAt = -999f;
 
     public float MaxHealth => maxHealth;
     public float CurrentHealth => currentHealth;
@@ -344,7 +383,7 @@ public class CarController : MonoBehaviour, IDamageable
     public bool ShowSurfaceNormals { get => showSurfaceNormals; set => showSurfaceNormals = value; }
     public bool AlwaysBoostDebug { get => alwaysBoostDebug; set => alwaysBoostDebug = value; }
     public float CurrentSpeed => rb != null ? rb.linearVelocity.magnitude : 0f;
-    public float SpeedRatio => Mathf.Clamp01(CurrentSpeed / Mathf.Max(0.01f, maxSpeed));
+    public float SpeedRatio => Mathf.Clamp01(CurrentPlanarSpeed() / Mathf.Max(0.01f, GetMaxSpeedAtFullBoostStacks()));
     public float RemainingBoostRatio => boostActive
         ? Mathf.Clamp01(boostTimer / Mathf.Max(0.01f, GetConfiguredBoostStackDuration()))
         : 0f;
@@ -362,17 +401,147 @@ public class CarController : MonoBehaviour, IDamageable
     {
         rb = GetComponent<Rigidbody>();
         col = GetComponent<Collider>();
+        EnsureWheelLocalPositions();
+        EnsureWheelStateCache();
+        ApplyRigidbodySettings();
+        EnsureControls();
 
-        // apply computed values if desired
-        ComputeDerivedStats();
+        maxHealth = Mathf.Max(1f, maxHealth);
+        currentHealth = maxHealth;
+        SetCheckpointRespawnPose(transform.position, transform.rotation);
+        SetupRamHitbox();
+        UpdateRamHitboxSize();
+        SetupRuntimeParticles();
+        SetupAudioSources();
+    }
 
-        // apply mass and center of mass (ComputeDerivedStats already sets rb.mass & rb.centerOfMass)
-        rb.useGravity = true;
-        rb.linearDamping = 0.5f;
-        rb.angularDamping = groundAngularDamping;
-        rb.maxAngularVelocity = 100f;
-        rb.interpolation = RigidbodyInterpolation.Interpolate;
-        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+    private void Reset()
+    {
+        wheelBase = 3.22f;
+        trackWidth = 1.86f;
+        wheelLocalPositions = CreateDefaultWheelLocalPositions();
+        vehicleMass = 900f;
+        suspensionDistance = 0.9f;
+        suspensionStiffness = 32000f;
+        suspensionDamping = 4500f;
+        tireGrip = 28f;
+        frontRollingResistance = 0.45f;
+        rearRollingResistance = 0.38f;
+        frontCoastDrag = 0.55f;
+        rearCoastDrag = 0.45f;
+        airGravityMultiplier = 0.85f;
+        fallGravityMultiplier = 1.15f;
+    }
+
+    private void OnValidate()
+    {
+        ClampInspectorValues();
+        EnsureWheelLocalPositions();
+    }
+
+    private void OnEnable()
+    {
+        EnsureControls();
+        controls.Player.Enable();
+    }
+
+    private void OnDisable()
+    {
+        if (noClipActive)
+            SetNoClipActive(false);
+
+        noClipAscendInput = false;
+        noClipDescendInput = false;
+        currentBoostStacks = 0;
+        boostTimer = 0f;
+        boostActive = false;
+        maxBoostStackLockout = false;
+        EndDrift(false);
+        StopRuntimeParticles();
+        StopAllVehicleAudio();
+
+        if (controls != null)
+            controls.Player.Disable();
+    }
+
+    private void OnDestroy()
+    {
+        if (controls != null)
+            controls.Dispose();
+    }
+
+    private void FixedUpdate()
+    {
+        if (GameState.NoClip != noClipActive)
+            SetNoClipActive(GameState.NoClip);
+
+        HandlePassiveRegen();
+
+        if (noClipActive)
+        {
+            HandleNoClipMovement();
+            StopAllVehicleAudio();
+            return;
+        }
+
+        if (HandleOutOfBoundsRespawn())
+            return;
+
+        wasGrounded = isGrounded;
+        SampleWheelContacts();
+        slopeAngle = isGrounded ? Vector3.Angle(averageGroundNormal, Vector3.up) : 0f;
+
+        HandleAirtimeTrick();
+
+        rb.angularDamping = isGrounded ? GetEffectiveGroundAngularDamping() : GetEffectiveAirAngularDamping();
+
+        if (isGrounded)
+            airDashUsed = false;
+
+        if (wasGrounded && !isGrounded)
+        {
+            rb.AddForce(ProjectOnPlaneSafe(transform.forward, Vector3.up) * GetEffectiveLeaveGroundBoost(), ForceMode.VelocityChange);
+            rb.AddForce(Vector3.up * GetEffectiveLeaveGroundUpBoost(), ForceMode.VelocityChange);
+        }
+
+        UpdateDriftState();
+        HandleBoost();
+
+        if (alwaysBoostDebug)
+        {
+            while (currentBoostStacks < GetBoostStackCap())
+                TryAddBoostStack();
+        }
+
+        UpdateRamHitboxSize();
+        UpdateRuntimeParticles();
+
+        if (isGrounded)
+        {
+            ApplySuspensionAndTireForces();
+            ApplyAntiRoll();
+            ApplyGroundStability();
+            ApplySlopeForces();
+            ApplyRampClimbAssist();
+            ApplySteepSlopeSlide();
+            DampRampPitch();
+        }
+        else
+        {
+            ApplyAirGravity();
+            ApplyAirUpright();
+        }
+
+        ApplySteeringYawAssist();
+        ClampPlanarSpeed();
+        UpdateWheelVisuals();
+        UpdateVehicleAudio();
+    }
+
+    void EnsureControls()
+    {
+        if (controls != null)
+            return;
 
         controls = new PlayerInputActions();
         controls.Player.Move.performed += c => moveInput = c.ReadValue<Vector2>();
@@ -383,29 +552,158 @@ public class CarController : MonoBehaviour, IDamageable
         controls.Player.Dash.started += _ => noClipDescendInput = true;
         controls.Player.Dash.canceled += _ => noClipDescendInput = false;
         controls.Player.Dash.performed += _ => OnDashPerformed();
-
-        maxHealth = Mathf.Max(1f, maxHealth);
-        currentHealth = maxHealth;
-        CacheGroundedPose();
-        SetupRamHitbox();
-        UpdateRamHitboxSize();
-        SetupRuntimeParticles();
     }
 
-    private void OnValidate()
+    void ApplyRigidbodySettings()
     {
+        if (rb == null)
+            return;
+
+        rb.mass = GetEffectiveVehicleMass();
+        float localGroundY = GetAverageWheelLocalY() - GetSuspensionWheelRadius();
+        float localCenterZ = GetSuspensionCenterLocalZ();
+        float wheelbase = GetEffectiveWheelBase();
+        rb.centerOfMass = new Vector3(
+            centerOfMassOffset.x,
+            localGroundY + Mathf.Max(0.05f, comHeight) + centerOfMassOffset.y,
+            localCenterZ + (frontWeightRatio - 0.5f) * wheelbase + centerOfMassOffset.z);
+        rb.useGravity = true;
+        rb.linearDamping = 0.08f;
+        rb.angularDamping = GetEffectiveGroundAngularDamping();
+        rb.maxAngularVelocity = 50f;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+    }
+
+    void ClampInspectorValues()
+    {
+        maxSpeed = Mathf.Max(1f, maxSpeed);
+        accelerationForce = Mathf.Max(0f, accelerationForce);
+        reverseMaxSpeed = Mathf.Max(1f, reverseMaxSpeed);
+        frontDriveBias = Mathf.Clamp01(frontDriveBias);
+        maxSteerAngle = Mathf.Clamp(maxSteerAngle, 1f, 60f);
+        highSpeedSteerAngle = Mathf.Clamp(highSpeedSteerAngle, 1f, maxSteerAngle);
+        steerResponse = Mathf.Max(0.1f, steerResponse);
+        yawAssist = Mathf.Max(0f, yawAssist);
+
+        maxBoostStacks = maxBoostStacks <= 1 ? 3 : Mathf.Clamp(maxBoostStacks, 1, 3);
+        boostSpeedPerStack = Mathf.Max(0f, boostSpeedPerStack);
+        boostImpulsePerStack = Mathf.Max(0f, boostImpulsePerStack);
+        boostAccelerationMultiplier = Mathf.Max(1f, boostAccelerationMultiplier);
+        minBoostStackDuration = Mathf.Clamp(minBoostStackDuration, 0.01f, 5f);
+        driftBoostDuration = Mathf.Max(minBoostStackDuration, driftBoostDuration);
+
+        jumpForce = Mathf.Max(0f, jumpForce);
+        groundAngularDamping = Mathf.Max(0f, groundAngularDamping);
+        airAngularDamping = Mathf.Max(0f, airAngularDamping);
+        rampPitchDamping = Mathf.Clamp01(rampPitchDamping);
+        groundedDownforce = Mathf.Max(0f, groundedDownforce);
+        groundUprightStrength = Mathf.Max(0f, groundUprightStrength);
+        groundUprightDamping = Mathf.Max(0f, groundUprightDamping);
+        airUprightStrength = Mathf.Max(0f, airUprightStrength);
+        airUprightDamping = Mathf.Max(0f, airUprightDamping);
+        antiRollStrength = Mathf.Max(0f, antiRollStrength);
+        airGravityMultiplier = Mathf.Clamp(airGravityMultiplier, 0.2f, 2.5f);
+        fallGravityMultiplier = Mathf.Clamp(fallGravityMultiplier, 0.2f, 3f);
+
+        driftSideForce = Mathf.Max(0f, driftSideForce);
+        driftGripRecovery = Mathf.Max(0f, driftGripRecovery);
+        minDriftSpeed = Mathf.Max(0f, minDriftSpeed);
+        driftSteerMultiplier = Mathf.Max(0.1f, driftSteerMultiplier);
+        lowSpeedDriftSideForceMultiplier = Mathf.Max(1f, lowSpeedDriftSideForceMultiplier);
+        minDriftYawFactor = Mathf.Clamp01(minDriftYawFactor);
+        driftLateralGripMultiplier = Mathf.Clamp(driftLateralGripMultiplier, 0.05f, 2f);
+        driftFrontGripMultiplier = Mathf.Clamp(driftFrontGripMultiplier, 0.05f, 2f);
+        driftRearGripMultiplier = Mathf.Clamp(driftRearGripMultiplier, 0.05f, 2f);
+        driftYawTorqueMultiplier = Mathf.Max(0f, driftYawTorqueMultiplier);
+        driftChargeTime = Mathf.Max(0f, driftChargeTime);
+        maxDriftBoost = Mathf.Max(0f, maxDriftBoost);
+        lateralSlipThreshold = Mathf.Max(0.1f, lateralSlipThreshold);
+
+        suspensionDistance = Mathf.Max(0.05f, suspensionDistance);
+        suspensionStiffness = Mathf.Max(1f, suspensionStiffness);
+        suspensionDamping = Mathf.Max(0f, suspensionDamping);
+        suspensionMaxForcePerWheel = Mathf.Max(1f, suspensionMaxForcePerWheel);
+        suspensionNormalBlend = Mathf.Clamp01(suspensionNormalBlend);
+        suspensionProbeSlack = Mathf.Max(0f, suspensionProbeSlack);
+        wheelVisualRadius = Mathf.Max(0.01f, wheelVisualRadius);
+        wheelSpinSpeedMultiplier = Mathf.Max(0f, wheelSpinSpeedMultiplier);
+        if (wheelSpinAxis.sqrMagnitude < 0.0001f)
+            wheelSpinAxis = Vector3.right;
+        wheelGizmoRadius = Mathf.Max(0.01f, wheelGizmoRadius);
+        forceGizmoScale = Mathf.Max(0.001f, forceGizmoScale);
+
+        tireGrip = Mathf.Max(0.1f, tireGrip);
+        frontTireGrip = Mathf.Max(0.01f, frontTireGrip);
+        rearTireGrip = Mathf.Max(0.01f, rearTireGrip);
+        tireGripSpeedFalloff = Mathf.Max(0f, tireGripSpeedFalloff);
+        maxLateralAcceleration = Mathf.Max(1f, maxLateralAcceleration);
+        frontRollingResistance = Mathf.Max(0f, frontRollingResistance);
+        rearRollingResistance = Mathf.Max(0f, rearRollingResistance);
+        frontCoastDrag = Mathf.Max(0f, frontCoastDrag);
+        rearCoastDrag = Mathf.Max(0f, rearCoastDrag);
+        brakeForce = Mathf.Max(0f, brakeForce);
+        driftRearRollingResistanceMultiplier = Mathf.Clamp01(driftRearRollingResistanceMultiplier);
+
+        downhillAcceleration = Mathf.Max(0f, downhillAcceleration);
+        maxDriveSlopeAngle = Mathf.Clamp(maxDriveSlopeAngle, 1f, 89f);
+        steepSlopeSlideForce = Mathf.Max(0f, steepSlopeSlideForce);
+        leaveGroundForwardBoost = Mathf.Max(0f, leaveGroundForwardBoost);
+        leaveGroundUpBoost = Mathf.Max(0f, leaveGroundUpBoost);
+        boostLeaveGroundUpBoost = Mathf.Max(0f, boostLeaveGroundUpBoost);
+        rampClimbAssist = Mathf.Max(0f, rampClimbAssist);
+        boostRampClimbAssist = Mathf.Max(0f, boostRampClimbAssist);
+        rampClimbAssistMinSlope = Mathf.Max(0f, rampClimbAssistMinSlope);
+        slopeSampleDistance = Mathf.Max(0.1f, slopeSampleDistance);
+        minSlopeAngleToAffect = Mathf.Max(0f, minSlopeAngleToAffect);
+
+        boostEnterVolume = Mathf.Clamp01(boostEnterVolume);
+        dashVolume = Mathf.Clamp01(dashVolume);
+        jumpVolume = Mathf.Clamp01(jumpVolume);
+        terrainThumpVolume = Mathf.Clamp01(terrainThumpVolume);
+        terrainCollisionSoundMinImpact = Mathf.Max(0f, terrainCollisionSoundMinImpact);
+        terrainCollisionSoundFullVolumeImpact = Mathf.Max(terrainCollisionSoundMinImpact + 0.01f, terrainCollisionSoundFullVolumeImpact);
+        terrainCollisionSoundMinVolumeScale = Mathf.Clamp(terrainCollisionSoundMinVolumeScale, 0f, 2f);
+        terrainCollisionSoundMaxVolumeScale = Mathf.Clamp(terrainCollisionSoundMaxVolumeScale, terrainCollisionSoundMinVolumeScale, 2f);
+        engineIdleVolume = Mathf.Clamp01(engineIdleVolume);
+        engineLoopVolume = Mathf.Clamp01(engineLoopVolume);
+        wheelRollingVolume = Mathf.Clamp01(wheelRollingVolume);
+        engineIdlePitch = Mathf.Clamp(engineIdlePitch, 0.1f, 3f);
+        engineMinPitch = Mathf.Clamp(engineMinPitch, 0.1f, 3f);
+        engineMaxPitch = Mathf.Clamp(engineMaxPitch, engineMinPitch, 3f);
+        engineRunningFullVolumeSpeed = Mathf.Max(0.01f, engineRunningFullVolumeSpeed);
+        engineAudioFadeSpeed = Mathf.Max(0f, engineAudioFadeSpeed);
+        wheelRollingMinSpeed = Mathf.Max(0f, wheelRollingMinSpeed);
+        wheelRollingMinPitch = Mathf.Clamp(wheelRollingMinPitch, 0.1f, 3f);
+        wheelRollingMaxPitch = Mathf.Clamp(wheelRollingMaxPitch, wheelRollingMinPitch, 3f);
+        audioSpatialBlend = Mathf.Clamp01(audioSpatialBlend);
+        audioMinDistance = Mathf.Max(0.01f, audioMinDistance);
+        audioMaxDistance = Mathf.Max(audioMinDistance, audioMaxDistance);
+        engineInputThreshold = Mathf.Clamp01(engineInputThreshold);
+        terrainCollisionSoundCooldown = Mathf.Max(0f, terrainCollisionSoundCooldown);
+
         maxHealth = Mathf.Max(1f, maxHealth);
         currentHealth = Application.isPlaying ? Mathf.Clamp(currentHealth, 0f, maxHealth) : maxHealth;
+        regenDelaySeconds = Mathf.Max(0f, regenDelaySeconds);
+        regenPerSecond = Mathf.Max(0f, regenPerSecond);
+        outOfBoundsY = Mathf.Max(0f, outOfBoundsY);
+        outOfBoundsRespawnDamage = Mathf.Max(0f, outOfBoundsRespawnDamage);
+        trickMinAirTime = Mathf.Max(0.01f, trickMinAirTime);
+        trickLandingGraceSeconds = Mathf.Max(0.01f, trickLandingGraceSeconds);
+        trickBoostReward = Mathf.Max(0f, trickBoostReward);
+        trickCooldownSeconds = Mathf.Max(0f, trickCooldownSeconds);
+
         collisionPushCurvePeakSpeed = Mathf.Max(0.01f, collisionPushCurvePeakSpeed);
         collisionSidePushWeight = Mathf.Max(0f, collisionSidePushWeight);
         collisionForwardPushWeight = Mathf.Max(0f, collisionForwardPushWeight);
         collisionRandomYawDegrees = Mathf.Clamp(collisionRandomYawDegrees, 0f, 90f);
         boostCollisionPushMultiplier = Mathf.Max(1f, boostCollisionPushMultiplier);
         boostCollisionMinPushStrength = Mathf.Max(0f, boostCollisionMinPushStrength);
-        maxBoostStacks = maxBoostStacks <= 1 ? 3 : Mathf.Clamp(maxBoostStacks, 1, 3);
-        boostSpeedPerStack = Mathf.Max(0f, boostSpeedPerStack);
-        minBoostStackDuration = Mathf.Clamp(minBoostStackDuration, 0.01f, 5f);
-        driftBoostDuration = Mathf.Max(minBoostStackDuration, driftBoostDuration);
+        collisionImpactCooldown = Mathf.Max(0f, collisionImpactCooldown);
+        boostWallBounceSpeedScale = Mathf.Max(0f, boostWallBounceSpeedScale);
+        boostWallBounceMinSpeed = Mathf.Max(0f, boostWallBounceMinSpeed);
+        boostWallBounceCooldown = Mathf.Max(0f, boostWallBounceCooldown);
+
         ramHitboxBaseSize.x = Mathf.Max(0.05f, ramHitboxBaseSize.x);
         ramHitboxBaseSize.y = Mathf.Max(0.05f, ramHitboxBaseSize.y);
         ramHitboxBaseSize.z = Mathf.Max(0.05f, ramHitboxBaseSize.z);
@@ -414,53 +712,16 @@ public class CarController : MonoBehaviour, IDamageable
         ramHitboxForwardExtensionPerExtraSpeed = Mathf.Max(0f, ramHitboxForwardExtensionPerExtraSpeed);
         nonBoostRamForwardSpeedLossPercent = Mathf.Clamp01(nonBoostRamForwardSpeedLossPercent);
         nonBoostRamForwardSpeedLossMax = Mathf.Max(0f, nonBoostRamForwardSpeedLossMax);
-#if false // Auto-steer temporarily disabled for build stabilization.
-        autoSteerMinSpeed = Mathf.Max(0f, autoSteerMinSpeed);
-        autoSteerFullSpeed = Mathf.Max(autoSteerMinSpeed + 0.01f, autoSteerFullSpeed);
-        autoSteerMinLookAhead = Mathf.Max(0.5f, autoSteerMinLookAhead);
-        autoSteerMaxLookAhead = Mathf.Max(autoSteerMinLookAhead, autoSteerMaxLookAhead);
-        autoSteerProbeRadius = Mathf.Max(0.05f, autoSteerProbeRadius);
-        autoSteerMaxInput = Mathf.Clamp01(autoSteerMaxInput);
-        autoSteerResponse = Mathf.Max(0.1f, autoSteerResponse);
-        autoSteerPredictionFrames = Mathf.Max(1, autoSteerPredictionFrames);
-        autoSteerPlayerTurnDeadzone = Mathf.Clamp01(autoSteerPlayerTurnDeadzone);
-        autoSteerSpeedSlopeBonus = Mathf.Clamp(autoSteerSpeedSlopeBonus, 0f, 30f);
-#endif
-        regenDelaySeconds = Mathf.Max(0f, regenDelaySeconds);
-        regenPerSecond = Mathf.Max(0f, regenPerSecond);
-        trickMinAirTime = Mathf.Max(0.01f, trickMinAirTime);
-        trickLandingGraceSeconds = Mathf.Max(0.01f, trickLandingGraceSeconds);
-        trickBoostReward = Mathf.Max(0f, trickBoostReward);
-        trickCooldownSeconds = Mathf.Max(0f, trickCooldownSeconds);
-        drivingParticleMinSpeed = Mathf.Max(0f, drivingParticleMinSpeed);
-        drivingParticleMaxRate = Mathf.Max(1f, drivingParticleMaxRate);
-        driftSparkleMaxRate = Mathf.Max(1f, driftSparkleMaxRate);
 
-        // keep editor responsive: compute derived stats when inspector is edited
-        ComputeDerivedStats();
-        UpdateRamHitboxSize();
-    }
-
-    private void OnEnable() => controls.Player.Enable();
-
-    private void OnDisable()
-    {
-        if (noClipActive)
-            SetNoClipActive(false);
-
-        noClipAscendInput = false;
-        noClipDescendInput = false;
-        freeFallStartedAt = -1f;
-        currentBoostStacks = 0;
-        boostTimer = 0f;
-        boostActive = false;
-#if false // Auto-steer temporarily disabled for build stabilization.
-        autoSteerInput = 0f;
-        autoSteerPerpendicularWallId = 0;
-        ClearAutoSteerDebug();
-#endif
-        StopRuntimeParticles();
-        controls.Player.Disable();
+        vehicleMass = Mathf.Max(1f, vehicleMass);
+        wheelBase = Mathf.Max(0.5f, wheelBase);
+        trackWidth = Mathf.Max(0.5f, trackWidth);
+        comHeight = Mathf.Max(0.05f, comHeight);
+        frontWeightRatio = Mathf.Clamp01(frontWeightRatio);
+        suspensionStiffnessScale = Mathf.Max(0.01f, suspensionStiffnessScale);
+        suspensionDampingScale = Mathf.Max(0.01f, suspensionDampingScale);
+        gripScale = Mathf.Max(0.01f, gripScale);
+        rollingResistanceScale = Mathf.Max(0.01f, rollingResistanceScale);
     }
 
     public bool TakeDamage(float amount, GameObject source = null)
@@ -487,173 +748,106 @@ public class CarController : MonoBehaviour, IDamageable
             return;
 
         isDead = true;
-        GameState.SetGameOver();
         Debug.Log(name + " died.", this);
-
-        if (disableControllerOnDeath)
-        {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-#if false // Auto-steer temporarily disabled for build stabilization.
-            autoSteerInput = 0f;
-            autoSteerPerpendicularWallId = 0;
-            ClearAutoSteerDebug();
-#endif
-            enabled = false;
-        }
+        RespawnAtCheckpoint(0f, restoreFullHealth: true, clampDamageToOneHealth: false);
     }
 
-    private bool CanControl() => isGrounded;
-
-    private void FixedUpdate()
+    bool HandleOutOfBoundsRespawn()
     {
-        if (GameState.NoClip != noClipActive)
-            SetNoClipActive(GameState.NoClip);
+        if (!respawnWhenBelowOutOfBoundsY || isDead)
+            return false;
+        if (transform.position.y >= outOfBoundsY)
+            return false;
+        if (hasCheckpointRespawnPose && checkpointRespawnPosition.y < outOfBoundsY)
+            return false;
 
-        HandlePassiveRegen();
-
-        if (noClipActive)
-        {
-            freeFallStartedAt = -1f;
-            HandleNoClipMovement();
-            return;
-        }
-
-        wasGrounded = isGrounded;
-        isGrounded = CheckGrounded();
-        slopeAngle = isGrounded ? Vector3.Angle(groundHit.normal, Vector3.up) : 0f;
-        HandleAirtimeTrick();
-        HandleFreeFallRecovery();
-
-        rb.angularDamping = isGrounded ? groundAngularDamping : airAngularDamping;
-
-        if (isGrounded) airDashUsed = false;
-
-        if (wasGrounded && !isGrounded)
-            rb.AddForce(transform.forward * leaveGroundForwardBoost, ForceMode.VelocityChange);
-
-        if (CanControl())
-        {
-            HandleSteering();
-            HandleAcceleration();
-            HandleDrift();
-        }
-
-        HandleBoost();
-        if (alwaysBoostDebug)
-        {
-            while (currentBoostStacks < GetBoostStackCap())
-                AddBoostStack();
-        }
-        UpdateRamHitboxSize();
-        UpdateRuntimeParticles();
-        ClampSpeed();
-
-        if (isGrounded)
-        {
-            ApplyArcadeDownforce();
-            ApplySuspensionAndTireForces();
-            ApplySlopeForces(); // downhill assist only
-            ApplySteepSlopeSlide();
-            DampRampPitch();
-        }
-        else
-        {
-            ApplyArcadeGravity();
-            AlignUprightInAir();
-        }
-
-        MaintainBoostSpeedAtCap();
+        RespawnAtCheckpoint(outOfBoundsRespawnDamage, restoreFullHealth: false, clampDamageToOneHealth: true);
+        return true;
     }
 
-    private void HandleFreeFallRecovery()
+    public void SetCheckpointRespawnPose(Vector3 position, Quaternion rotation)
     {
-        if (isDead || GameState.IsGameOver)
-            return;
-
-        if (isGrounded)
-        {
-            freeFallStartedAt = -1f;
-            CacheGroundedPose();
-            return;
-        }
-
-        if (freeFallStartedAt < 0f)
-            freeFallStartedAt = Time.time;
-
-        float requiredDelay = Mathf.Max(0f, freeFallRecoveryDelaySeconds);
-        if (Time.time - freeFallStartedAt < requiredDelay)
-            return;
-
-        TriggerFreeFallRecovery();
+        checkpointRespawnPosition = position;
+        checkpointRespawnRotation = rotation;
+        hasCheckpointRespawnPose = true;
     }
 
-    private void TriggerFreeFallRecovery()
+    public void RespawnAtCheckpoint(float damage = 0f, bool restoreFullHealth = false, bool clampDamageToOneHealth = false)
     {
-        freeFallStartedAt = -1f;
+        if (!hasCheckpointRespawnPose)
+            SetCheckpointRespawnPose(transform.position, transform.rotation);
 
-        if (!hasLastGroundedPose)
-            return;
-
-        // Recovery is a fail-safe reposition, not a valid trick landing.
-        trickInAir = false;
-        trickCandidateReady = false;
-        trickAirTimer = 0f;
-        lastTrickSucceeded = false;
+        ResetForRespawn();
 
         if (rb != null)
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
-            rb.position = lastGroundedPosition;
-            rb.rotation = lastGroundedRotation;
+            rb.position = checkpointRespawnPosition;
+            rb.rotation = checkpointRespawnRotation;
         }
         else
         {
-            transform.SetPositionAndRotation(lastGroundedPosition, lastGroundedRotation);
+            transform.SetPositionAndRotation(checkpointRespawnPosition, checkpointRespawnRotation);
         }
 
-        if (freeFallRecoveryDamage > 0f)
-            TakeDamage(freeFallRecoveryDamage);
+        if (restoreFullHealth)
+            currentHealth = maxHealth;
+        else
+            ApplyRespawnDamage(damage, clampDamageToOneHealth);
+
+        isDead = false;
+        isRegenerating = false;
     }
 
-    private void CacheGroundedPose()
+    void ApplyRespawnDamage(float damage, bool clampDamageToOneHealth)
     {
-        lastGroundedPosition = transform.position;
-        lastGroundedRotation = transform.rotation;
-        hasLastGroundedPose = true;
+        if (damage <= 0f || GameState.GodMode)
+            return;
+
+        float minimumHealth = clampDamageToOneHealth ? 1f : 0f;
+        currentHealth = Mathf.Max(minimumHealth, currentHealth - damage);
+        regenPausedUntil = Time.time + regenDelaySeconds;
     }
 
-    private void OnJumpPerformed()
+    void ResetForRespawn()
+    {
+        EndDrift(false);
+        trickInAir = false;
+        trickCandidateReady = false;
+        trickAirTimer = 0f;
+        lastTrickSucceeded = false;
+        airDashUsed = false;
+        airDashTimer = 0f;
+        currentSteerAngle = 0f;
+        currentBoostStacks = 0;
+        boostTimer = 0f;
+        boostActive = false;
+        maxBoostStackLockout = false;
+        StopRuntimeParticles();
+        StopAllVehicleAudio();
+    }
+
+    void OnJumpPerformed()
     {
         if (!noClipActive && Jump())
+        {
+            PlayVehicleOneShot(jumpSFX, jumpVolume);
             JumpPerformed?.Invoke();
+        }
     }
 
-    private void OnDashPerformed()
+    void OnDashPerformed()
     {
-        if (!noClipActive)
+        if (!noClipActive && !isGrounded)
         {
             TryAirDash();
+            PlayVehicleOneShot(dashSFX, dashVolume);
             DashPerformed?.Invoke();
         }
     }
 
-    public bool RestoreHealth(float amount, bool allowOverheal = false)
-    {
-        if (isDead || amount <= 0f)
-            return false;
-
-        float clampedMax = allowOverheal ? maxHealth + amount : maxHealth;
-        float target = Mathf.Min(currentHealth + amount, clampedMax);
-        if (target <= currentHealth)
-            return false;
-
-        currentHealth = target;
-        return true;
-    }
-
-    private void HandlePassiveRegen()
+    void HandlePassiveRegen()
     {
         isRegenerating = false;
         if (!enablePassiveRegen || isDead || GameState.IsGameOver)
@@ -663,14 +857,11 @@ public class CarController : MonoBehaviour, IDamageable
         if (Time.time < regenPausedUntil)
             return;
 
-        float healAmount = regenPerSecond * Time.fixedDeltaTime;
-        if (healAmount <= 0f)
-            return;
-
-        isRegenerating = RestoreHealth(healAmount);
+        currentHealth = Mathf.Min(maxHealth, currentHealth + regenPerSecond * Time.fixedDeltaTime);
+        isRegenerating = currentHealth < maxHealth;
     }
 
-    private void HandleAirtimeTrick()
+    void HandleAirtimeTrick()
     {
         if (lastTrickSucceeded && Time.time - lastTrickSucceededAt > trickLandingGraceSeconds)
             lastTrickSucceeded = false;
@@ -683,7 +874,8 @@ public class CarController : MonoBehaviour, IDamageable
             return;
         }
 
-        trickCooldownTimer = Mathf.Max(0f, trickCooldownTimer - Time.fixedDeltaTime);
+        if (trickCooldownTimer > 0f)
+            trickCooldownTimer = Mathf.Max(0f, trickCooldownTimer - Time.fixedDeltaTime);
 
         if (!isGrounded)
         {
@@ -692,7 +884,6 @@ public class CarController : MonoBehaviour, IDamageable
                 trickInAir = true;
                 trickCandidateReady = false;
                 trickAirTimer = 0f;
-                return;
             }
 
             trickAirTimer += Time.fixedDeltaTime;
@@ -703,8 +894,7 @@ public class CarController : MonoBehaviour, IDamageable
         if (!trickInAir)
             return;
 
-        bool success = trickCandidateReady && trickCooldownTimer <= 0f;
-        if (success)
+        if (trickCandidateReady && trickCooldownTimer <= 0f)
         {
             ApplyTrickBoostReward();
             trickCooldownTimer = trickCooldownSeconds;
@@ -723,42 +913,46 @@ public class CarController : MonoBehaviour, IDamageable
         trickAirTimer = 0f;
     }
 
-    private void ApplyTrickBoostReward()
+    void ApplyTrickBoostReward()
     {
         if (trickBoostReward <= 0f)
             return;
 
-        // Airtime reward should match a single fresh drift boost (no stacking).
         ApplyBaseDriftBoost();
     }
 
-    private void ApplyBaseDriftBoost()
+    void ApplyBaseDriftBoost()
     {
-        driftBoostAmount = boostSpeedPerStack;
+        if (IsMaxBoostStackLockoutActive())
+            return;
 
+        driftBoostAmount = boostSpeedPerStack;
         bool wasBoostActive = boostActive && currentBoostStacks > 0 && boostTimer > 0f;
         int previousBoostStacks = currentBoostStacks;
-        currentBoostStacks = 1;
+        currentBoostStacks = Mathf.Max(1, currentBoostStacks);
         boostTimer = GetConfiguredBoostStackDuration();
         boostActive = true;
+        if (currentBoostStacks >= GetBoostStackCap())
+            maxBoostStackLockout = true;
+
+        ApplyBoostImpulse(0.7f);
 
         if (currentBoostStacks != previousBoostStacks)
             BoostStackGained?.Invoke();
 
         if (!wasBoostActive)
+        {
+            PlayVehicleOneShot(boostEnterSFX, boostEnterVolume);
             BoostActivated?.Invoke();
+        }
     }
 
-    private void SetNoClipActive(bool active)
+    void SetNoClipActive(bool active)
     {
         noClipActive = active;
         noClipAscendInput = false;
         noClipDescendInput = false;
-#if false // Auto-steer temporarily disabled for build stabilization.
-        autoSteerInput = 0f;
-        autoSteerPerpendicularWallId = 0;
-        ClearAutoSteerDebug();
-#endif
+        EndDrift(false);
 
         if (rb == null)
             return;
@@ -774,11 +968,9 @@ public class CarController : MonoBehaviour, IDamageable
             ramHitbox.enabled = !active;
     }
 
-    private void HandleNoClipMovement()
+    void HandleNoClipMovement()
     {
-        Vector3 forward = transform.forward * moveInput.y;
-        Vector3 right = transform.right * moveInput.x;
-        Vector3 planarMove = forward + right;
+        Vector3 planarMove = transform.forward * moveInput.y + transform.right * moveInput.x;
         if (planarMove.sqrMagnitude > 1f)
             planarMove.Normalize();
 
@@ -792,398 +984,554 @@ public class CarController : MonoBehaviour, IDamageable
         rb.MovePosition(rb.position + velocity * Time.fixedDeltaTime);
     }
 
-    // ---------------- Derived stats calculation ----------------
-    private void ComputeDerivedStats()
+    bool TryProbeWheelContact(int wheelIndex, Vector3 springUp, float restLength, float wheelRadius, out Vector3 local, out Vector3 wheelWorld, out Vector3 rayOrigin, out RaycastHit hit, out float springLength)
     {
-        if (!autoCalculatePhysics)
-            return;
+        local = GetWheelLocalPosition(wheelIndex);
+        wheelWorld = GetWheelWorldPosition(wheelIndex, local);
+        Vector3 probeUp = springUp.sqrMagnitude > 0.0001f ? springUp.normalized : transform.up;
+        rayOrigin = wheelWorld + probeUp * restLength;
 
-        if (rb == null) rb = GetComponent<Rigidbody>();
-        int wheelCount = Mathf.Max(1, (wheelTransforms != null ? wheelTransforms.Length : 4));
+        Vector3 springDown = -probeUp;
+        float rayLength = restLength + wheelRadius + Mathf.Max(0f, suspensionProbeSlack);
+        float sphereRadius = Mathf.Max(0.01f, wheelRadius);
 
-        // Mass
-        rb.mass = Mathf.Max(1f, vehicleMass);
+        bool sphereHit = Physics.SphereCast(rayOrigin, sphereRadius, springDown, out hit, rayLength, groundLayer, QueryTriggerInteraction.Ignore);
+        bool rayHit = !sphereHit && Physics.Raycast(rayOrigin, springDown, out hit, rayLength, groundLayer, QueryTriggerInteraction.Ignore);
 
-        // center of mass: set relative to object center
-        // positive z is forward. If frontWeightRatio > 0.5, shift COM forward
-        float longitudinalOffset = (frontWeightRatio - 0.5f) * wheelBase;
-        Vector3 calculatedCOM = new Vector3(0f, -Mathf.Max(0.01f, comHeight), longitudinalOffset);
-        // add manual small tweak offset
-        rb.centerOfMass = calculatedCOM + centerOfMassOffset;
-
-        // Per-wheel mass & normal
-        float perWheelMass = vehicleMass / (float)wheelCount;
-        float g = Physics.gravity.magnitude;
-        float perWheelNormal = perWheelMass * g; // N
-
-        // Suspension stiffness: base spring that supports per-wheel normal over travel (N/m),
-        // then scaled by suspensionStiffnessScale to match expected "game" stiffness numbers.
-        float baseSpring = perWheelNormal / Mathf.Max(0.01f, suspensionDistance); // N/m
-        suspensionStiffness = baseSpring * Mathf.Max(0.0001f, suspensionStiffnessScale);
-
-        // Damping: approximated from critical damping c = 2*sqrt(k*m)
-        float c = 2f * Mathf.Sqrt(Mathf.Max(0.0001f, suspensionStiffness) * perWheelMass);
-        suspensionDamping = c * Mathf.Max(0.0001f, suspensionDampingScale);
-
-        // Tire grip: derive from typical friction coefficient (mu ~ 0.8) and per-wheel normal.
-        // Convert to the script's "grip" number by dividing by a reference speed (so lateralForce ~= mu*normal at low speeds).
-        float mu = 0.9f; // typical rubber-on-tarmac friction estimate for lateral grip baseline
-        float referenceSpeed = Mathf.Max(5f, maxSpeed); // avoid divide-by-zero, tie to vehicle top speed
-        float computedGrip = (mu * perWheelNormal) / referenceSpeed;
-        tireGrip = computedGrip * Mathf.Max(0.0001f, gripScale);
-
-        // Rolling resistance & coast drag (scaled by vehicleMass so big cars feel heavier)
-        float massFactor = vehicleMass / 1200f;
-        frontRollingResistance = 18f * massFactor * Mathf.Max(0.0001f, rollingResistanceScale);
-        rearRollingResistance  = 18f * massFactor * Mathf.Max(0.0001f, rollingResistanceScale);
-        frontCoastDrag = 20f * massFactor * Mathf.Max(0.0001f, rollingResistanceScale);
-        rearCoastDrag  = 20f * massFactor * Mathf.Max(0.0001f, rollingResistanceScale);
-
-        // Brake force baseline
-        brakeForce = 80f * massFactor * Mathf.Max(0.0001f, rollingResistanceScale);
-
-        // Keep sane clamps (protect against crazy inputs)
-        suspensionStiffness = Mathf.Clamp(suspensionStiffness, 100f, 1e6f);
-        suspensionDamping = Mathf.Clamp(suspensionDamping, 0f, 1e5f);
-        tireGrip = Mathf.Clamp(tireGrip, 1f, 2000f);
-        frontRollingResistance = Mathf.Clamp(frontRollingResistance, 0.1f, 500f);
-        rearRollingResistance = Mathf.Clamp(rearRollingResistance, 0.1f, 500f);
-        frontCoastDrag = Mathf.Clamp(frontCoastDrag, 0f, 500f);
-        rearCoastDrag = Mathf.Clamp(rearCoastDrag, 0f, 500f);
-        brakeForce = Mathf.Clamp(brakeForce, 10f, 1000f);
-
-        // Debug log a short summary so you can see results at runtime
-        if (Application.isPlaying)
+        if (!sphereHit && !rayHit)
         {
-            Debug.Log($"[CarController] Derived stats: mass={rb.mass:F0}kg, COM={rb.centerOfMass}, suspensionK={suspensionStiffness:F0} N/m, damping={suspensionDamping:F1}, tireGrip={tireGrip:F1}, frontRR={frontRollingResistance:F1}, rearRR={rearRollingResistance:F1}");
+            springLength = restLength;
+            return false;
         }
+
+        springLength = sphereHit
+            ? Mathf.Clamp(hit.distance, 0f, restLength)
+            : Mathf.Clamp(hit.distance - wheelRadius, 0f, restLength);
+        return true;
     }
 
-    // ---------------- MOVEMENT ----------------
-    private void HandleAcceleration()
+    void SampleWheelContacts()
     {
-        if (Mathf.Abs(moveInput.y) < 0.01f) return;
+        EnsureWheelStateCache();
+        groundedWheelCount = 0;
+        frontGroundedCount = 0;
+        rearGroundedCount = 0;
+        averageGroundNormal = Vector3.zero;
 
+        float restLength = GetSuspensionRestLength();
+        float wheelRadius = GetSuspensionWheelRadius();
+        Vector3 carUp = transform.up.sqrMagnitude > 0.0001f ? transform.up.normalized : Vector3.up;
+
+        for (int i = 0; i < wheelStates.Length; i++)
+        {
+            Vector3 local;
+            Vector3 wheelWorld;
+            Vector3 origin;
+            RaycastHit hit;
+            float springLength;
+
+            Vector3 wheelUp = carUp;
+
+            bool grounded = TryProbeWheelContact(i, wheelUp, restLength, wheelRadius, out local, out wheelWorld, out origin, out hit, out springLength);
+
+            WheelState state = wheelStates[i];
+            state.localPosition = local;
+            Vector3 springDirection = wheelUp;
+            Vector3 currentWheelWorld = grounded ? origin - springDirection * springLength : wheelWorld;
+            state.wheelWorldPosition = currentWheelWorld;
+            state.rayOrigin = origin;
+            state.isFront = local.z >= GetSuspensionCenterLocalZ();
+            state.isLeft = local.x < 0f;
+            state.grounded = grounded;
+            state.normal = grounded ? hit.normal : Vector3.up;
+            state.springDirection = springDirection;
+            state.wheelForward = ProjectOnPlaneSafe(transform.forward, grounded ? state.normal : Vector3.up);
+            state.wheelRight = ProjectOnPlaneSafe(transform.right, grounded ? state.normal : Vector3.up);
+            state.compression = grounded ? Mathf.Clamp01((restLength - springLength) / restLength) : 0f;
+            state.springLength = springLength;
+            state.hitPoint = grounded ? hit.point : origin - springDirection * (restLength + wheelRadius + Mathf.Max(0f, suspensionProbeSlack));
+            state.springForce = 0f;
+            state.forwardSpeed = 0f;
+            state.lateralSpeed = 0f;
+            state.lateralAcceleration = 0f;
+            state.driveAcceleration = 0f;
+            state.rollingAcceleration = 0f;
+
+            if (grounded)
+            {
+                groundedWheelCount++;
+                if (state.isFront)
+                    frontGroundedCount++;
+                else
+                    rearGroundedCount++;
+
+                float contactWeight = Mathf.Lerp(0.35f, 1f, state.compression);
+                averageGroundNormal += hit.normal * contactWeight;
+            }
+
+            wheelStates[i] = state;
+        }
+
+        isGrounded = groundedWheelCount > 0;
         if (isGrounded)
         {
-            float slope = Vector3.Angle(groundHit.normal, Vector3.up);
-
-            // Disallow driving up slopes steeper than allowed
-            if (slope > maxDriveSlopeAngle)
-                return;
-
-            Vector3 forwardDir = Vector3.ProjectOnPlane(transform.forward, groundHit.normal).normalized;
-
-            float speedRatio = rb.linearVelocity.magnitude / maxSpeed;
-            float accelFalloff = Mathf.Lerp(1f, 0.35f, speedRatio);
-
-            rb.AddForce(forwardDir * moveInput.y * accelerationForce * accelFalloff, ForceMode.Acceleration);
+            averageGroundNormal.Normalize();
+            groundHit.normal = averageGroundNormal;
         }
         else
         {
-            rb.AddForce(transform.forward * moveInput.y * accelerationForce * 0.15f, ForceMode.Acceleration);
+            averageGroundNormal = Vector3.up;
+            groundHit.normal = Vector3.zero;
         }
     }
 
-    private void HandleSteering()
+    void ApplySuspensionAndTireForces()
     {
-        // Auto-steer disabled: use only direct player steering input.
-        float steerInput = Mathf.Clamp(moveInput.x, -1f, 1f);
-        if (Mathf.Abs(steerInput) < 0.01f) return;
+        if (rb == null || wheelStates == null || wheelStates.Length == 0)
+            return;
 
-        float steerStrength = isDrifting ? driftSteerMultiplier : 1f;
-        float turn = steerInput * turnSpeed * steerStrength * Time.fixedDeltaTime;
-        rb.MoveRotation(rb.rotation * Quaternion.Euler(0f, turn, 0f));
-    }
+        UpdateSteerAngle();
 
-#if false // Auto-steer temporarily disabled for build stabilization.
-    private float ComputeAutoSteerInput(float playerSteerInput)
-    {
-        ClearAutoSteerDebug();
+        float restLength = GetSuspensionRestLength();
+        float stiffness = GetEffectiveSuspensionStiffness();
+        float damping = GetEffectiveSuspensionDamping();
+        float maxSpringForce = GetEffectiveSuspensionMaxForce();
+        float planarSpeedRatio = Mathf.Clamp01(CurrentPlanarSpeed() / Mathf.Max(0.01f, GetCurrentAllowedSpeed()));
 
-        if (!autoSteerEnabled || rb == null)
-            return MoveAutoSteerTowards(0f);
-
-        Vector3 planarVelocity = rb.linearVelocity;
-        planarVelocity.y = 0f;
-        float planarSpeed = planarVelocity.magnitude;
-
-        autoSteerDebugActive = true;
-        if (planarSpeed > 0.001f)
-            autoSteerDebugDirection = planarVelocity / planarSpeed;
-
-        if (Mathf.Abs(playerSteerInput) >= autoSteerPlayerTurnDeadzone)
+        for (int i = 0; i < wheelStates.Length; i++)
         {
-            autoSteerDebugSuppressedByPlayer = true;
-            return MoveAutoSteerTowards(0f);
-        }
-
-        if (planarSpeed <= autoSteerMinSpeed)
-        {
-            autoSteerDebugSuppressedBySpeed = true;
-            return MoveAutoSteerTowards(0f);
-        }
-
-        Vector3 travelDirection = planarVelocity / Mathf.Max(0.0001f, planarSpeed);
-        float predictedDistance = planarSpeed * Time.fixedDeltaTime * autoSteerPredictionFrames;
-        float lookAhead = Mathf.Clamp(predictedDistance, autoSteerMinLookAhead, autoSteerMaxLookAhead);
-
-        if (!TryGetUpcomingAutoSteerWallHit(travelDirection, planarSpeed, lookAhead, out RaycastHit wallHit, out float danger))
-        {
-            autoSteerPerpendicularWallId = 0;
-            return MoveAutoSteerTowards(0f);
-        }
-
-        float steerSign = GetAutoSteerDirectionFromWall(travelDirection, wallHit);
-        autoSteerDebugSteerSign = steerSign;
-        if (Mathf.Abs(steerSign) <= 0.001f)
-            return MoveAutoSteerTowards(0f);
-
-        float speedFactor = Mathf.InverseLerp(autoSteerMinSpeed, autoSteerFullSpeed, planarSpeed);
-        float targetAssist = steerSign * danger * speedFactor * autoSteerMaxInput;
-        return MoveAutoSteerTowards(targetAssist);
-    }
-
-    private float MoveAutoSteerTowards(float target)
-    {
-        autoSteerInput = Mathf.MoveTowards(autoSteerInput, target, autoSteerResponse * Time.fixedDeltaTime);
-        return autoSteerInput;
-    }
-
-    private bool TryGetUpcomingAutoSteerWallHit(
-        Vector3 travelDirection,
-        float travelSpeed,
-        float lookAheadDistance,
-        out RaycastHit nearestWallHit,
-        out float danger)
-    {
-        nearestWallHit = default;
-        danger = 0f;
-
-        float originHeight = col != null ? Mathf.Max(0.25f, col.bounds.extents.y * 0.4f) : 0.35f;
-        float forwardOffset = col != null ? Mathf.Max(0.25f, col.bounds.extents.z * 0.3f) : 0.4f;
-        Vector3 origin = rb.worldCenterOfMass + Vector3.up * originHeight + travelDirection * forwardOffset;
-        autoSteerDebugOrigin = origin;
-        autoSteerDebugDirection = travelDirection;
-        autoSteerDebugLookAhead = lookAheadDistance;
-        autoSteerDebugHasWallHit = false;
-        autoSteerDebugDanger = 0f;
-
-        int hitCount = Physics.SphereCastNonAlloc(
-            origin,
-            autoSteerProbeRadius,
-            travelDirection,
-            autoSteerProbeHits,
-            lookAheadDistance,
-            autoSteerLayerMask,
-            QueryTriggerInteraction.Ignore);
-
-        if (hitCount <= 0)
-            return false;
-
-        float nearestDistance = float.PositiveInfinity;
-        for (int i = 0; i < hitCount; i++)
-        {
-            RaycastHit hit = autoSteerProbeHits[i];
-            if (!IsAutoSteerWall(hit, travelDirection, travelSpeed))
+            WheelState state = wheelStates[i];
+            if (!state.grounded)
                 continue;
 
-            if (hit.distance < nearestDistance)
-            {
-                nearestDistance = hit.distance;
-                nearestWallHit = hit;
-            }
+            Vector3 springDir = Vector3.Slerp(transform.up, state.normal, suspensionNormalBlend);
+            if (springDir.sqrMagnitude < 0.0001f)
+                springDir = state.normal;
+            springDir.Normalize();
+
+            Vector3 forcePoint = state.rayOrigin;
+            Vector3 pointVelocity = rb.GetPointVelocity(forcePoint);
+            float springOffset = restLength - state.springLength;
+            float springVelocity = Vector3.Dot(pointVelocity, springDir);
+            float springForce = springOffset * stiffness;
+            float damperForce = -springVelocity * damping;
+            float netSpringForce = Mathf.Clamp(springForce + damperForce, 0f, maxSpringForce);
+            rb.AddForceAtPosition(springDir * netSpringForce, forcePoint, ForceMode.Force);
+            state.springDirection = springDir;
+            state.springForce = netSpringForce;
+
+            Vector3 wheelForward = GetWheelForwardDirection(state);
+            Vector3 wheelRight = Vector3.Cross(springDir, wheelForward);
+            if (wheelRight.sqrMagnitude < 0.0001f)
+                wheelRight = ProjectOnPlaneSafe(transform.right, state.normal);
+            else
+                wheelRight.Normalize();
+
+            pointVelocity = rb.GetPointVelocity(GetTireForcePoint(state));
+            float forwardSpeed = Vector3.Dot(pointVelocity, wheelForward);
+            float lateralSpeed = Vector3.Dot(pointVelocity, wheelRight);
+            state.wheelForward = wheelForward;
+            state.wheelRight = wheelRight;
+            state.forwardSpeed = forwardSpeed;
+            state.lateralSpeed = lateralSpeed;
+            state.lateralAcceleration = ApplyTireGrip(state, wheelRight, lateralSpeed, planarSpeedRatio);
+            state.driveAcceleration = ApplyDriveAndBrake(state, wheelForward, forwardSpeed, planarSpeedRatio, out float rollingAcceleration);
+            state.rollingAcceleration = rollingAcceleration;
+
+            wheelStates[i] = state;
         }
 
-        if (float.IsPositiveInfinity(nearestDistance))
-            return false;
-
-        danger = 1f - Mathf.Clamp01(nearestDistance / Mathf.Max(0.01f, lookAheadDistance));
-        autoSteerDebugHasWallHit = true;
-        autoSteerDebugWallPoint = nearestWallHit.point;
-        autoSteerDebugWallNormal = nearestWallHit.normal;
-        autoSteerDebugDanger = danger;
-        return danger > 0f;
+        if (isGrounded && groundedDownforce > 0f)
+            rb.AddForce(-averageGroundNormal * GetEffectiveDownforce(), ForceMode.Acceleration);
     }
 
-    private float GetAutoSteerDirectionFromWall(Vector3 travelDirection, RaycastHit wallHit)
+    float ApplyTireGrip(WheelState state, Vector3 wheelRight, float lateralSpeed, float planarSpeedRatio)
     {
-        Vector3 wallNormal = wallHit.normal;
-        wallNormal.y = 0f;
-        if (wallNormal.sqrMagnitude < 0.0001f)
-            return 0f;
-
-        wallNormal.Normalize();
-        float intoWall = Vector3.Dot(travelDirection, -wallNormal);
-        if (intoWall <= 0.05f)
-            return 0f;
-
-        Vector3 wallTangent = Vector3.Cross(wallNormal, Vector3.up);
-        if (wallTangent.sqrMagnitude < 0.0001f)
-            return 0f;
-        wallTangent.Normalize();
-
-        float tangentComponent = Vector3.Dot(travelDirection, wallTangent);
-        if (Mathf.Abs(tangentComponent) > 0.03f)
-        {
-            autoSteerPerpendicularWallId = 0;
-            return Mathf.Sign(tangentComponent);
-        }
-
-        int wallId = wallHit.collider != null ? wallHit.collider.GetInstanceID() : 0;
-        if (wallId != autoSteerPerpendicularWallId)
-        {
-            autoSteerPerpendicularWallId = wallId;
-            autoSteerPerpendicularTurnSign = Random.value < 0.5f ? -1f : 1f;
-        }
-
-        return autoSteerPerpendicularTurnSign;
-    }
-
-    private bool IsAutoSteerWall(RaycastHit hit, Vector3 probeDirection, float travelSpeed)
-    {
-        if (hit.collider == null)
-            return false;
-
-        if (hit.collider.transform.IsChildOf(transform))
-            return false;
-
-        Rigidbody hitBody = hit.collider.attachedRigidbody;
-        if (hitBody != null && hitBody != rb && !hitBody.isKinematic)
-            return false;
-
-        float driveableSlopeLimit = GetAutoSteerDriveableSlopeLimit(travelSpeed);
-        float slope = Vector3.Angle(hit.normal, Vector3.up);
-        if (slope <= driveableSlopeLimit)
-            return false;
-
-        return Vector3.Dot(-hit.normal, probeDirection) > 0.05f;
-    }
-
-    private float GetAutoSteerDriveableSlopeLimit(float speed)
-    {
-        float speedFactor = Mathf.InverseLerp(autoSteerMinSpeed, autoSteerFullSpeed, speed);
-        float bonus = autoSteerSpeedSlopeBonus * speedFactor;
-        return Mathf.Clamp(maxDriveSlopeAngle + bonus, 0f, 89f);
-    }
-
-    private void ClearAutoSteerDebug()
-    {
-        autoSteerDebugActive = false;
-        autoSteerDebugSuppressedByPlayer = false;
-        autoSteerDebugSuppressedBySpeed = false;
-        autoSteerDebugOrigin = Vector3.zero;
-        autoSteerDebugDirection = Vector3.zero;
-        autoSteerDebugLookAhead = 0f;
-        autoSteerDebugHasWallHit = false;
-        autoSteerDebugWallPoint = Vector3.zero;
-        autoSteerDebugWallNormal = Vector3.zero;
-        autoSteerDebugDanger = 0f;
-        autoSteerDebugSteerSign = 0f;
-    }
-#endif
-
-    // ---------------- DRIFT ----------------
-    private void HandleDrift()
-    {
-        if (!isGrounded)
-        {
-            if (isDrifting)
-            {
-                isDrifting = false;
-                DriftEnded?.Invoke();
-            }
-
-            return;
-        }
-
-        float speed = rb.linearVelocity.magnitude;
-        bool wasDriftingLocal = isDrifting;
-
-        isDrifting = speed > minDriftSpeed && Mathf.Abs(moveInput.x) > 0.2f && moveInput.y > 0.1f;
-
-        if (!wasDriftingLocal && isDrifting)
-            DriftStarted?.Invoke();
+        float grip = GetEffectiveTireGrip();
+        grip *= state.isFront ? Mathf.Max(0.01f, frontTireGrip) : Mathf.Max(0.01f, rearTireGrip);
+        grip *= gripCurve != null ? Mathf.Max(0f, gripCurve.Evaluate(planarSpeedRatio)) : 1f;
+        grip *= Mathf.Lerp(0.55f, 1f, state.compression);
+        grip /= 1f + CurrentPlanarSpeed() * GetEffectiveTireGripSpeedFalloff();
 
         if (isDrifting)
         {
-            // lateral force to push car sideways
-            Vector3 driftDir = transform.right * Mathf.Sign(moveInput.x);
-            float speedRatio = Mathf.Clamp01(speed / Mathf.Max(0.0001f, maxSpeed));
-            float lowSpeedAssist = 1f - speedRatio;
-            float sideForceMultiplier = Mathf.Lerp(1f, lowSpeedDriftSideForceMultiplier, lowSpeedAssist);
-            rb.AddForce(driftDir * driftSideForce * sideForceMultiplier * Time.fixedDeltaTime, ForceMode.Acceleration);
-
-            // pivot logic based on front/rear lateral velocities
-            float frontLat = GetAverageLateralVelocity(true);
-            float rearLat = GetAverageLateralVelocity(false);
-            float frontGripFactor = 1f / (1f + Mathf.Abs(frontLat) / Mathf.Max(0.001f, lateralSlipThreshold));
-            float rearSlipFactor = Mathf.Clamp01(Mathf.Abs(rearLat) / lateralSlipThreshold);
-            float pivotT = Mathf.Clamp01(rearSlipFactor * frontGripFactor);
-            float pivotDistance = Mathf.Lerp(-rearPivotDistance, frontPivotDistance, pivotT);
-
-            float speedFactor = Mathf.Clamp01(rb.linearVelocity.magnitude / Mathf.Max(0.1f, maxSpeed));
-            speedFactor = Mathf.Max(minDriftYawFactor, speedFactor);
-            float yawAmount = moveInput.x * driftYawTorque * driftYawTorqueMultiplier * (1f + Mathf.Abs(pivotDistance) / (Mathf.Max(frontPivotDistance, rearPivotDistance) + 0.001f)) * speedFactor;
-            rb.AddTorque(Vector3.up * yawAmount * Time.fixedDeltaTime, ForceMode.Acceleration);
-
-            // charge drift boost
-            driftTimer += Time.fixedDeltaTime;
-            if (driftChargeTime <= 0f) driftCharge = 1f;
-            else
-            {
-                driftCharge += Time.fixedDeltaTime / Mathf.Max(0.0001f, driftChargeTime);
-                driftCharge = Mathf.Clamp01(driftCharge);
-            }
+            grip *= driftLateralGripMultiplier;
+            grip *= state.isFront ? driftFrontGripMultiplier : driftRearGripMultiplier;
         }
 
-        if (wasDriftingLocal && !isDrifting)
-        {
-            DriftEnded?.Invoke();
-            bool completedChargedDrift = driftTimer >= driftChargeTime && driftCharge > 0f;
-            bool completedStackingDrift = boostActive && driftTimer > 0.05f;
+        int divisor = Mathf.Max(1, groundedWheelCount);
+        float lateralAcceleration = Mathf.Clamp(-lateralSpeed * grip / divisor, -maxLateralAcceleration, maxLateralAcceleration);
+        rb.AddForceAtPosition(wheelRight * lateralAcceleration, GetTireForcePoint(state), ForceMode.Acceleration);
+        return lateralAcceleration;
+    }
 
-            if (completedChargedDrift || completedStackingDrift)
+    float ApplyDriveAndBrake(WheelState state, Vector3 wheelForward, float forwardSpeed, float planarSpeedRatio, out float rollingAcceleration)
+    {
+        float throttle = Mathf.Clamp(moveInput.y, -1f, 1f);
+        float absThrottle = Mathf.Abs(throttle);
+        float driveAcceleration = 0f;
+        float appliedDriveAcceleration = 0f;
+        float allowedSpeed = GetCurrentAllowedSpeed();
+        float forwardPlanarSpeed = Vector3.Dot(rb.linearVelocity, ProjectOnPlaneSafe(transform.forward, Vector3.up));
+
+        if (throttle > 0.01f)
+        {
+            if (forwardPlanarSpeed < allowedSpeed)
             {
-                driftBoostAmount = boostSpeedPerStack;
-                AddBoostStack();
+                float falloff = Mathf.Lerp(1f, 0.28f, Mathf.Clamp01(forwardPlanarSpeed / Mathf.Max(0.01f, allowedSpeed)));
+                driveAcceleration = GetEffectiveAccelerationForce() * throttle * falloff;
+                if (boostActive)
+                    driveAcceleration *= boostAccelerationMultiplier;
             }
-            driftCharge = 0f;
-            driftTimer = 0f;
+        }
+        else if (throttle < -0.01f)
+        {
+            if (forwardPlanarSpeed > 0.5f)
+                driveAcceleration = -GetEffectiveBrakeForce() * absThrottle;
+            else if (forwardPlanarSpeed > -reverseMaxSpeed)
+                driveAcceleration = GetEffectiveAccelerationForce() * throttle * 0.45f;
+        }
+
+        if (Mathf.Abs(driveAcceleration) > 0.001f && CanDriveOnCurrentSlope())
+        {
+            float driveShare = GetDriveShare(state);
+            appliedDriveAcceleration = driveAcceleration * driveShare;
+            rb.AddForceAtPosition(wheelForward * appliedDriveAcceleration, GetTireForcePoint(state), ForceMode.Acceleration);
+        }
+
+        float rollingResistance = state.isFront ? GetEffectiveFrontRollingResistance() : GetEffectiveRearRollingResistance();
+        float coastDrag = state.isFront ? GetEffectiveFrontCoastDrag() : GetEffectiveRearCoastDrag();
+        if (isDrifting && !state.isFront)
+            rollingResistance *= driftRearRollingResistanceMultiplier;
+
+        float dragAcceleration = -forwardSpeed * rollingResistance;
+        if (absThrottle < 0.01f)
+            dragAcceleration += -forwardSpeed * coastDrag;
+
+        dragAcceleration /= Mathf.Max(1, groundedWheelCount);
+        rb.AddForceAtPosition(wheelForward * dragAcceleration, GetTireForcePoint(state), ForceMode.Acceleration);
+        rollingAcceleration = dragAcceleration;
+        return appliedDriveAcceleration;
+    }
+
+    Vector3 GetTireForcePoint(WheelState state)
+    {
+        return state.wheelWorldPosition;
+    }
+
+    float GetDriveShare(WheelState state)
+    {
+        float frontBias = Mathf.Clamp01(frontDriveBias);
+        if (state.isFront)
+            return frontGroundedCount > 0 ? frontBias / frontGroundedCount : 0f;
+
+        float rearBias = 1f - frontBias;
+        return rearGroundedCount > 0 ? rearBias / rearGroundedCount : 0f;
+    }
+
+    void UpdateSteerAngle()
+    {
+        float steerInput = GetEffectiveSteerInput();
+        float speedRatio = Mathf.Clamp01(CurrentPlanarSpeed() / Mathf.Max(0.01f, GetCurrentAllowedSpeed()));
+        float availableSteer = Mathf.Lerp(maxSteerAngle, highSpeedSteerAngle, speedRatio);
+        if (isDrifting)
+            availableSteer *= driftSteerMultiplier;
+
+        float targetSteer = steerInput * availableSteer;
+        float response = 1f - Mathf.Exp(-steerResponse * Time.fixedDeltaTime);
+        currentSteerAngle = Mathf.Lerp(currentSteerAngle, targetSteer, response);
+    }
+
+    float GetEffectiveSteerInput()
+    {
+        float steerInput = Mathf.Clamp(moveInput.x, -1f, 1f);
+        return IsBackingUp() ? -steerInput : steerInput;
+    }
+
+    bool IsBackingUp()
+    {
+        float throttle = Mathf.Clamp(moveInput.y, -1f, 1f);
+        if (throttle >= -0.01f)
+            return false;
+
+        float forwardPlanarSpeed = Vector3.Dot(rb.linearVelocity, ProjectOnPlaneSafe(transform.forward, Vector3.up));
+        return forwardPlanarSpeed <= 0.5f;
+    }
+
+    Vector3 GetWheelForwardDirection(WheelState state)
+    {
+        Vector3 forward = ProjectOnPlaneSafe(transform.forward, state.normal);
+        if (state.isFront)
+            forward = Quaternion.AngleAxis(currentSteerAngle, state.normal) * forward;
+
+        return ProjectOnPlaneSafe(forward, state.normal);
+    }
+
+    void ApplySteeringYawAssist()
+    {
+        if (!isGrounded || rb == null)
+            return;
+
+        float steer = GetEffectiveSteerInput();
+        if (Mathf.Abs(steer) < 0.01f)
+            return;
+
+        float speedFactor = Mathf.Clamp01(CurrentPlanarSpeed() / Mathf.Max(0.01f, maxSpeed));
+        speedFactor = isDrifting ? Mathf.Max(minDriftYawFactor, speedFactor) : speedFactor;
+        float torque = isDrifting
+            ? GetEffectiveDriftYawTorque() * driftYawTorqueMultiplier
+            : GetEffectiveTurnYawAssist();
+        rb.AddTorque(averageGroundNormal * steer * torque * speedFactor, ForceMode.Acceleration);
+
+        if (!isDrifting)
+            return;
+
+        float lowSpeedAssist = 1f - Mathf.Clamp01(CurrentPlanarSpeed() / Mathf.Max(0.01f, maxSpeed));
+        float sideForceMultiplier = Mathf.Lerp(1f, lowSpeedDriftSideForceMultiplier, lowSpeedAssist);
+        Vector3 driftDir = ProjectOnPlaneSafe(transform.right * Mathf.Sign(steer), averageGroundNormal);
+        rb.AddForce(driftDir * GetEffectiveDriftSideForce() * sideForceMultiplier, ForceMode.Acceleration);
+    }
+
+    void ApplyAntiRoll()
+    {
+        if (antiRollStrength <= 0f || wheelStates == null || wheelStates.Length == 0)
+            return;
+
+        ApplyAntiRollForAxle(true);
+        ApplyAntiRollForAxle(false);
+    }
+
+    void ApplyAntiRollForAxle(bool front)
+    {
+        int left = -1;
+        int right = -1;
+        for (int i = 0; i < wheelStates.Length; i++)
+        {
+            if (wheelStates[i].isFront != front)
+                continue;
+
+            if (wheelStates[i].isLeft)
+                left = i;
+            else
+                right = i;
+        }
+
+        if (left < 0 || right < 0)
+            return;
+
+        float leftTravel = wheelStates[left].grounded ? wheelStates[left].compression : 0f;
+        float rightTravel = wheelStates[right].grounded ? wheelStates[right].compression : 0f;
+        float antiRollForce = (leftTravel - rightTravel) * antiRollStrength;
+        Vector3 forceDir = transform.up;
+
+        if (wheelStates[left].grounded)
+            rb.AddForceAtPosition(-forceDir * antiRollForce, wheelStates[left].wheelWorldPosition, ForceMode.Force);
+        if (wheelStates[right].grounded)
+            rb.AddForceAtPosition(forceDir * antiRollForce, wheelStates[right].wheelWorldPosition, ForceMode.Force);
+    }
+
+    void ApplyGroundStability()
+    {
+        Vector3 desiredUp = Vector3.Slerp(Vector3.up, averageGroundNormal, 0.65f).normalized;
+        ApplyUprightTorque(desiredUp, groundUprightStrength, groundUprightDamping);
+    }
+
+    void ApplyAirUpright()
+    {
+        ApplyUprightTorque(Vector3.up, airUprightStrength, airUprightDamping);
+    }
+
+    void ApplyUprightTorque(Vector3 desiredUp, float strength, float damping)
+    {
+        if (rb == null || strength <= 0f)
+            return;
+
+        Vector3 currentUp = transform.up;
+        Vector3 correctionAxis = Vector3.Cross(currentUp, desiredUp);
+        float correctionMagnitude = correctionAxis.magnitude;
+        if (correctionMagnitude > 0.0001f)
+        {
+            correctionAxis /= correctionMagnitude;
+            float angle = Vector3.Angle(currentUp, desiredUp) * Mathf.Deg2Rad;
+            rb.AddTorque(correctionAxis * angle * strength, ForceMode.Acceleration);
+        }
+
+        Vector3 yawVelocity = Vector3.Project(rb.angularVelocity, currentUp);
+        Vector3 pitchRollVelocity = rb.angularVelocity - yawVelocity;
+        rb.AddTorque(-pitchRollVelocity * damping, ForceMode.Acceleration);
+    }
+
+    void DampRampPitch()
+    {
+        if (slopeAngle < 8f)
+            return;
+
+        Vector3 localAngularVelocity = transform.InverseTransformDirection(rb.angularVelocity);
+        localAngularVelocity.x *= rampPitchDamping;
+        rb.angularVelocity = transform.TransformDirection(localAngularVelocity);
+    }
+
+    void ApplyAirGravity()
+    {
+        if (airDashTimer > 0f)
+        {
+            airDashTimer -= Time.fixedDeltaTime;
+            return;
+        }
+
+        float gravityMultiplier = rb.linearVelocity.y < 0f ? GetEffectiveFallGravityMultiplier() : GetEffectiveAirGravityMultiplier();
+        rb.AddForce(Physics.gravity * (gravityMultiplier - 1f), ForceMode.Acceleration);
+    }
+
+    void ApplySlopeForces()
+    {
+        lastSampleHadHits = false;
+        lastFrontSample = lastBackSample = Vector3.zero;
+        lastSampledSlopeAngle = 0f;
+
+        if (!isGrounded || averageGroundNormal == Vector3.zero)
+            return;
+
+        float halfDistance = slopeSampleDistance;
+        Vector3 upOffset = transform.up * (GetSuspensionRestLength() + GetSuspensionWheelRadius() + 0.2f);
+        Vector3 frontOrigin = transform.position + transform.forward * halfDistance + upOffset;
+        Vector3 backOrigin = transform.position - transform.forward * halfDistance + upOffset;
+        float sampleDistance = GetSuspensionRestLength() + GetSuspensionWheelRadius() + 5f;
+
+        if (!Physics.Raycast(frontOrigin, -transform.up, out RaycastHit hitFront, sampleDistance, groundLayer, QueryTriggerInteraction.Ignore))
+            return;
+        if (!Physics.Raycast(backOrigin, -transform.up, out RaycastHit hitBack, sampleDistance, groundLayer, QueryTriggerInteraction.Ignore))
+            return;
+
+        lastSampleHadHits = true;
+        lastFrontSample = hitFront.point;
+        lastBackSample = hitBack.point;
+
+        float heightDifference = hitFront.point.y - hitBack.point.y;
+        float run = halfDistance * 2f;
+        float angleDegrees = Mathf.Atan2(heightDifference, run) * Mathf.Rad2Deg;
+        lastSampledSlopeAngle = angleDegrees;
+
+        if (Mathf.Abs(angleDegrees) < minSlopeAngleToAffect)
+            return;
+
+        if (angleDegrees < 0f)
+        {
+            float normalized = Mathf.Clamp01(Mathf.Abs(angleDegrees) / 90f);
+            Vector3 downhill = ProjectOnPlaneSafe(transform.forward, averageGroundNormal);
+            rb.AddForce(downhill * downhillAcceleration * normalized, ForceMode.Acceleration);
+        }
+    }
+
+    void ApplyRampClimbAssist()
+    {
+        if (!isGrounded || rb == null || moveInput.y <= 0.05f)
+            return;
+
+        float slope = Mathf.Max(slopeAngle, Mathf.Abs(lastSampledSlopeAngle));
+        if (slope < rampClimbAssistMinSlope)
+            return;
+
+        float slopeRatio = Mathf.Clamp01((slope - rampClimbAssistMinSlope) / Mathf.Max(1f, maxDriveSlopeAngle - rampClimbAssistMinSlope));
+        float speedRatio = Mathf.Clamp01(CurrentPlanarSpeed() / Mathf.Max(0.01f, GetCurrentAllowedSpeed()));
+        float assist = Mathf.Lerp(rampClimbAssist, boostRampClimbAssist, boostActive ? 1f : 0f);
+        assist *= moveInput.y * Mathf.Lerp(0.55f, 1f, speedRatio) * slopeRatio;
+        if (assist <= 0f)
+            return;
+
+        Vector3 climbDirection = (Vector3.up * 0.65f) + ProjectOnPlaneSafe(transform.forward, Vector3.up) * 0.35f;
+        rb.AddForce(climbDirection.normalized * assist, ForceMode.Acceleration);
+    }
+
+    void ApplySteepSlopeSlide()
+    {
+        float slope = Vector3.Angle(averageGroundNormal, Vector3.up);
+        if (slope <= maxDriveSlopeAngle)
+            return;
+
+        Vector3 slideDir = Vector3.ProjectOnPlane(Vector3.down, averageGroundNormal);
+        if (slideDir.sqrMagnitude < 0.0001f)
+            return;
+
+        rb.AddForce(slideDir.normalized * steepSlopeSlideForce, ForceMode.Acceleration);
+    }
+
+    bool CanDriveOnCurrentSlope()
+    {
+        return !isGrounded || slopeAngle <= maxDriveSlopeAngle;
+    }
+
+    void UpdateDriftState()
+    {
+        bool shouldDrift = ShouldBuildDriftBoost();
+        if (!shouldDrift)
+        {
+            EndDrift(isGrounded);
+            if (isGrounded && rb != null)
+                RecoverLateralGrip();
+            return;
         }
 
         if (!isDrifting)
         {
-            Vector3 localVel = transform.InverseTransformDirection(rb.linearVelocity);
-            localVel.x = Mathf.Lerp(localVel.x, 0f, driftGripRecovery * Time.fixedDeltaTime * Mathf.Clamp01(speed / maxSpeed));
-            rb.linearVelocity = transform.TransformDirection(localVel);
+            isDrifting = true;
+            DriftStarted?.Invoke();
         }
+
+        driftTimer += Time.fixedDeltaTime;
+        if (driftChargeTime <= 0f)
+            driftCharge = 1f;
+        else
+            driftCharge = Mathf.Clamp01(driftCharge + Time.fixedDeltaTime / Mathf.Max(0.0001f, driftChargeTime));
     }
 
-    private float GetAverageLateralVelocity(bool front)
+    bool ShouldBuildDriftBoost()
     {
-        if (wheelTransforms == null || wheelTransforms.Length == 0) return 0f;
-        float sum = 0f; int count = 0;
-        foreach (Transform w in wheelTransforms)
-        {
-            bool isFront = transform.InverseTransformPoint(w.position).z > 0f;
-            if (front != isFront) continue;
-            Vector3 pointVel = rb.GetPointVelocity(w.position);
-            Vector3 local = transform.InverseTransformDirection(pointVel);
-            sum += local.x; count++;
-        }
-        if (count == 0) return 0f;
-        return sum / count;
+        if (!isGrounded || rb == null)
+            return false;
+
+        return CurrentPlanarSpeed() > minDriftSpeed &&
+               Mathf.Abs(moveInput.x) > 0.2f &&
+               moveInput.y > 0.1f;
     }
 
-    // ---------------- BOOST ----------------
-    private void HandleBoost()
+    void EndDrift(bool awardBoost)
+    {
+        if (!isDrifting)
+            return;
+
+        isDrifting = false;
+        DriftEnded?.Invoke();
+
+        bool completedChargedDrift = driftChargeTime <= 0f
+            ? driftTimer > 0f
+            : driftTimer >= driftChargeTime && driftCharge >= 1f;
+        if (awardBoost && completedChargedDrift)
+        {
+            driftBoostAmount = boostSpeedPerStack;
+            TryAddBoostStack();
+        }
+
+        driftCharge = 0f;
+        driftTimer = 0f;
+    }
+
+    void RecoverLateralGrip()
+    {
+        Vector3 localVelocity = transform.InverseTransformDirection(rb.linearVelocity);
+        float speedRatio = Mathf.Clamp01(CurrentPlanarSpeed() / Mathf.Max(0.01f, maxSpeed));
+        localVelocity.x = Mathf.Lerp(localVelocity.x, 0f, driftGripRecovery * Time.fixedDeltaTime * speedRatio);
+        rb.linearVelocity = transform.TransformDirection(localVelocity);
+    }
+
+    void HandleBoost()
     {
         if (currentBoostStacks <= 0)
         {
             currentBoostStacks = 0;
             boostTimer = 0f;
             boostActive = false;
+            maxBoostStackLockout = false;
             return;
         }
 
@@ -1193,242 +1541,150 @@ public class CarController : MonoBehaviour, IDamageable
             boostTimer = 0f;
             currentBoostStacks = 0;
             boostActive = false;
+            maxBoostStackLockout = false;
             return;
         }
 
         boostActive = true;
     }
 
-    private void ClampSpeed()
+    bool TryAddBoostStack()
     {
-        float allowedSpeed = maxSpeed + GetTotalActiveBoostAmount();
-        if (rb.linearVelocity.magnitude > allowedSpeed) rb.linearVelocity = rb.linearVelocity.normalized * allowedSpeed;
+        if (IsMaxBoostStackLockoutActive())
+            return false;
+
+        float stackDuration = GetConfiguredBoostStackDuration();
+        int stackCap = GetBoostStackCap();
+        bool wasBoostActive = boostActive;
+        int previousBoostStacks = currentBoostStacks;
+
+        currentBoostStacks = Mathf.Min(currentBoostStacks + 1, stackCap);
+        bool gainedBoostStack = currentBoostStacks > previousBoostStacks;
+        if (!gainedBoostStack)
+        {
+            if (currentBoostStacks >= stackCap)
+                maxBoostStackLockout = true;
+
+            return false;
+        }
+
+        boostTimer = stackDuration;
+        boostActive = true;
+        if (currentBoostStacks >= stackCap)
+            maxBoostStackLockout = true;
+
+        ApplyBoostImpulse(1f);
+        PlayVehicleOneShot(boostEnterSFX, boostEnterVolume);
+        BoostStackGained?.Invoke();
+
+        if (!wasBoostActive)
+            BoostActivated?.Invoke();
+
+        return true;
     }
 
-    private void MaintainBoostSpeedAtCap()
+    void ApplyBoostImpulse(float multiplier)
     {
-        if (!boostActive || rb == null)
+        if (rb == null)
             return;
 
-        float targetPlanarSpeed = maxSpeed + GetTotalActiveBoostAmount();
-        if (targetPlanarSpeed <= 0f)
+        Vector3 boostDirection = ProjectOnPlaneSafe(transform.forward, Vector3.up);
+        if (boostDirection.sqrMagnitude < 0.0001f)
+            boostDirection = transform.forward;
+
+        rb.AddForce(boostDirection.normalized * boostImpulsePerStack * Mathf.Max(0f, multiplier), ForceMode.VelocityChange);
+    }
+
+    float GetTotalActiveBoostAmount()
+    {
+        return Mathf.Max(0f, boostSpeedPerStack) * Mathf.Max(0, currentBoostStacks);
+    }
+
+    float GetCurrentAllowedSpeed()
+    {
+        return maxSpeed + GetTotalActiveBoostAmount();
+    }
+
+    float GetMaxSpeedAtFullBoostStacks()
+    {
+        return maxSpeed + Mathf.Max(0f, boostSpeedPerStack) * GetBoostStackCap();
+    }
+
+    float GetConfiguredBoostStackDuration()
+    {
+        float minDuration = Mathf.Clamp(minBoostStackDuration, 0.01f, 5f);
+        return Mathf.Max(minDuration, driftBoostDuration);
+    }
+
+    int GetBoostStackCap()
+    {
+        return maxBoostStacks <= 1 ? 3 : Mathf.Clamp(maxBoostStacks, 1, 3);
+    }
+
+    bool IsMaxBoostStackLockoutActive()
+    {
+        int stackCap = GetBoostStackCap();
+        if (currentBoostStacks < stackCap || boostTimer <= 0f)
+            return false;
+
+        if (boostActive)
+            maxBoostStackLockout = true;
+
+        return maxBoostStackLockout;
+    }
+
+    void ClampPlanarSpeed()
+    {
+        if (rb == null)
             return;
 
         Vector3 velocity = rb.linearVelocity;
-        Vector3 planarDirection = transform.forward;
-        planarDirection.y = 0f;
-        if (planarDirection.sqrMagnitude < 0.0001f)
-            planarDirection = Vector3.forward;
-        else
-            planarDirection.Normalize();
+        Vector3 planar = new Vector3(velocity.x, 0f, velocity.z);
+        float allowedSpeed = GetCurrentAllowedSpeed();
+        float hardCap = Mathf.Max(allowedSpeed + 4f, allowedSpeed * 1.18f);
+        if (planar.magnitude <= hardCap)
+            return;
 
-        Vector3 boostedPlanarVelocity = planarDirection * targetPlanarSpeed;
-        rb.linearVelocity = new Vector3(boostedPlanarVelocity.x, velocity.y, boostedPlanarVelocity.z);
+        planar = planar.normalized * hardCap;
+        rb.linearVelocity = new Vector3(planar.x, velocity.y, planar.z);
     }
 
-    // ---------------- JUMP ----------------
-    private bool Jump()
+    bool Jump()
     {
-        if (!isGrounded) return false;
-        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+        if (!isGrounded)
+            return false;
+
+        Vector3 velocity = rb.linearVelocity;
+        if (velocity.y < 0f)
+            velocity.y = 0f;
+        rb.linearVelocity = velocity;
         rb.AddForce(Vector3.up * jumpForce, ForceMode.VelocityChange);
         return true;
     }
 
-    // ---------------- AIR DASH ----------------
-    private void TryAirDash()
+    void TryAirDash()
     {
-        if (isGrounded || airDashUsed) return;
+        if (isGrounded || airDashUsed)
+            return;
+
         airDashUsed = true;
         airDashTimer = airDashCooldown;
-        Vector3 vel = rb.linearVelocity;
-        float forwardSpeed = Vector3.Dot(vel, transform.forward);
+        Vector3 velocity = rb.linearVelocity;
+        float forwardSpeed = Vector3.Dot(velocity, transform.forward);
         Vector3 carriedForward = transform.forward * Mathf.Max(0f, forwardSpeed) * airDashForwardCarry;
-        vel = new Vector3(carriedForward.x, Mathf.Max(vel.y, 0f), carriedForward.z);
-        rb.linearVelocity = vel;
+        rb.linearVelocity = new Vector3(carriedForward.x, Mathf.Max(velocity.y, 0f), carriedForward.z);
         rb.AddForce(transform.forward * airDashForce + Vector3.up * airDashUpForce, ForceMode.VelocityChange);
-    }
-
-    // ---------------- ARCADE ----------------
-    private void ApplyArcadeDownforce()
-    {
-        float slope = Vector3.Angle(groundHit.normal, Vector3.up);
-        if (slope > maxDriveSlopeAngle) return;
-        rb.AddForce(-groundHit.normal * groundedDownforce, ForceMode.Acceleration);
-    }
-
-    private void DampRampPitch()
-    {
-        if (slopeAngle < 8f) return;
-        Vector3 angVel = rb.angularVelocity;
-        angVel.x *= rampPitchDamping;
-        rb.angularVelocity = angVel;
-    }
-
-    private void ApplyArcadeGravity()
-    {
-        if (airDashTimer > 0f) { airDashTimer -= Time.fixedDeltaTime; return; }
-        float gravityMult = rb.linearVelocity.y < 0f ? fallGravityMultiplier : airGravityMultiplier;
-        rb.AddForce(Physics.gravity * (gravityMult - 1f), ForceMode.Acceleration);
-    }
-
-    private void AlignUprightInAir()
-    {
-        Quaternion target = Quaternion.Euler(0f, rb.rotation.eulerAngles.y, 0f);
-        rb.MoveRotation(Quaternion.Slerp(rb.rotation, target, 4f * Time.fixedDeltaTime));
-    }
-
-    // ---------------- SUSPENSION + TIRE FORCES ----------------
-    private void ApplySuspensionAndTireForces()
-    {
-        if (wheelTransforms == null || wheelTransforms.Length == 0) return;
-
-        Vector3 averageNormal = Vector3.zero;
-        int hitCount = 0;
-        float rayLength = suspensionDistance * 2f;
-
-        for (int i = 0; i < wheelTransforms.Length; i++)
-        {
-            Transform wheel = wheelTransforms[i];
-            Vector3 origin = wheel.position + Vector3.up * suspensionDistance;
-            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, rayLength, groundLayer))
-            {
-                averageNormal += hit.normal;
-                hitCount++;
-
-                // compression 0..1
-                float compression = Mathf.Clamp01((rayLength - hit.distance) / rayLength);
-
-                // spring & damper (vertical)
-                float springForce = compression * suspensionStiffness;
-                float wheelPointVelUp = Vector3.Dot(rb.GetPointVelocity(wheel.position), hit.normal);
-                float damperForce = wheelPointVelUp * suspensionDamping;
-                float netForce = Mathf.Clamp(springForce - damperForce, -suspensionMaxForcePerWheel, suspensionMaxForcePerWheel);
-
-                // Apply vertical spring force at wheel point
-                rb.AddForceAtPosition(hit.normal * netForce, wheel.position, ForceMode.Acceleration);
-
-                // --- LATERAL TIRE FRICTION (speed-dependent curve + front/rear multipliers) ---
-                Vector3 lateralDir = Vector3.ProjectOnPlane(transform.right, hit.normal).normalized;
-                float lateralVel = Vector3.Dot(rb.GetPointVelocity(wheel.position), lateralDir);
-
-                // compute speed ratio (0..1)
-                float speedRatio = Mathf.Clamp01(rb.linearVelocity.magnitude / Mathf.Max(0.0001f, maxSpeed));
-                // evaluate grip curve (designer curve) and combine with base grip
-                float curveGripMult = (gripCurve != null) ? gripCurve.Evaluate(speedRatio) : 1f;
-                bool isFront = transform.InverseTransformPoint(wheel.position).z > 0f;
-                float wheelGripMult = isFront ? frontTireGrip : rearTireGrip;
-
-                float grip = tireGrip * wheelGripMult * curveGripMult * (0.5f + 0.5f * compression);
-                // legacy speed falloff factor (keeps quick tweak available)
-                float legacyFalloff = 1f / (1f + (rb.linearVelocity.magnitude * tireGripSpeedFalloff));
-                grip *= legacyFalloff;
-                if (isDrifting)
-                {
-                    grip *= driftLateralGripMultiplier;
-                    grip *= isFront ? driftFrontGripMultiplier : driftRearGripMultiplier;
-                }
-
-                float lateralForce = -lateralVel * grip;
-                rb.AddForceAtPosition(lateralDir * lateralForce, wheel.position, ForceMode.Acceleration);
-
-                // --- LONGITUDINAL (FORWARD) TIRE FRICTION / ROLLING RESISTANCE ---
-                Vector3 forwardDir = Vector3.ProjectOnPlane(transform.forward, hit.normal).normalized;
-                float forwardVel = Vector3.Dot(rb.GetPointVelocity(wheel.position), forwardDir);
-
-                // select front/rear rolling and coast drag
-                float rollingResistance = isFront ? frontRollingResistance : rearRollingResistance;
-                float coastDrag = isFront ? frontCoastDrag : rearCoastDrag;
-
-                // dynamic reduction of rear rolling while drifting (helps sustain slide)
-                if (isDrifting && !isFront)
-                    rollingResistance *= driftRearRollingResistanceMultiplier;
-
-                // base rolling resistance (opposes forward velocity)
-                float rolling = -forwardVel * rollingResistance;
-
-                // extra coast drag when player is not giving throttle
-                if (Mathf.Abs(moveInput.y) < 0.01f)
-                {
-                    rolling += -forwardVel * coastDrag;
-                }
-
-                // braking when player pulls negative (brake / reverse)
-                if (moveInput.y < -0.01f)
-                {
-                    float braking = -Mathf.Sign(forwardVel) * brakeForce * Mathf.Abs(moveInput.y);
-                    rolling += braking;
-                }
-
-                // scale by compression so unloaded wheels don't massively affect braking
-                rolling *= (0.5f + 0.5f * compression);
-
-                rb.AddForceAtPosition(forwardDir * rolling, wheel.position, ForceMode.Acceleration);
-            }
-        }
-
-        if (hitCount > 0)
-        {
-            averageNormal.Normalize();
-            groundHit.normal = averageNormal;
-        }
-    }
-
-    // ---------------- SLOPE FORCES (ONLY DOWNHILL ASSIST NOW) ----------------
-    private void ApplySlopeForces()
-    {
-        lastSampleHadHits = false;
-        lastFrontSample = lastBackSample = Vector3.zero;
-        lastSampledSlopeAngle = 0f;
-
-        if (wheelTransforms == null || wheelTransforms.Length == 0) return;
-        if (groundHit.normal == Vector3.zero) return;
-
-        float halfDist = slopeSampleDistance;
-        Vector3 frontOrigin = transform.position + transform.forward * halfDist + Vector3.up * (suspensionDistance + 0.2f);
-        Vector3 backOrigin = transform.position - transform.forward * halfDist + Vector3.up * (suspensionDistance + 0.2f);
-
-        if (!Physics.Raycast(frontOrigin, Vector3.down, out RaycastHit hitF, (suspensionDistance + 5f), groundLayer)) return;
-        if (!Physics.Raycast(backOrigin, Vector3.down, out RaycastHit hitB, (suspensionDistance + 5f), groundLayer)) return;
-
-        lastSampleHadHits = true;
-        lastFrontSample = hitF.point;
-        lastBackSample = hitB.point;
-
-        float heightDiff = hitF.point.y - hitB.point.y; // positive => front higher (uphill)
-        float run = halfDist * 2f;
-        float angleDeg = Mathf.Atan2(heightDiff, run) * Mathf.Rad2Deg;
-        lastSampledSlopeAngle = angleDeg;
-
-        if (Mathf.Abs(angleDeg) < minSlopeAngleToAffect) return;
-
-        Vector3 forwardPlane = Vector3.ProjectOnPlane(transform.forward, groundHit.normal).normalized;
-
-        // only apply downhill assist (negative angle => forward is downhill)
-        if (angleDeg < 0f)
-        {
-            float normalized = Mathf.Clamp01(Mathf.Abs(angleDeg) / 90f);
-            float forceMag = downhillAcceleration * normalized;
-            rb.AddForce(forwardPlane * forceMag, ForceMode.Acceleration);
-        }
-    }
-
-    // ---------------- STEEP SLOPE SLIDE ----------------
-    private void ApplySteepSlopeSlide()
-    {
-        float slope = Vector3.Angle(groundHit.normal, Vector3.up);
-        if (slope <= maxDriveSlopeAngle) return;
-        Vector3 slideDir = Vector3.ProjectOnPlane(Vector3.down, groundHit.normal).normalized;
-        rb.AddForce(slideDir * steepSlopeSlideForce, ForceMode.Acceleration);
     }
 
     void OnCollisionEnter(Collision collision)
     {
+        TryPlayTerrainCollisionSound(collision);
         TryBoostWallBounce(collision);
     }
 
     void OnCollisionStay(Collision collision)
     {
+        TryPlayTerrainCollisionSound(collision);
         TryBoostWallBounce(collision);
     }
 
@@ -1452,14 +1708,12 @@ public class CarController : MonoBehaviour, IDamageable
             return;
 
         ContactPoint contact = collision.GetContact(0);
-        Vector3 normal = contact.normal;
-
         Vector3 planarVelocity = rb.linearVelocity;
         planarVelocity.y = 0f;
         if (planarVelocity.sqrMagnitude < 0.01f)
             return;
 
-        Vector3 planarNormal = normal;
+        Vector3 planarNormal = contact.normal;
         planarNormal.y = 0f;
         if (planarNormal.sqrMagnitude < 0.0001f)
             return;
@@ -1470,37 +1724,13 @@ public class CarController : MonoBehaviour, IDamageable
             return;
 
         Vector3 reflected = Vector3.Reflect(planarVelocity, planarNormal);
-        float targetSpeed = Mathf.Max(boostWallBounceMinSpeed, planarVelocity.magnitude * Mathf.Max(0f, boostWallBounceSpeedScale));
         if (reflected.sqrMagnitude < 0.0001f)
             return;
 
+        float targetSpeed = Mathf.Max(boostWallBounceMinSpeed, planarVelocity.magnitude * boostWallBounceSpeedScale);
         reflected = reflected.normalized * targetSpeed;
         rb.linearVelocity = new Vector3(reflected.x, rb.linearVelocity.y, reflected.z);
         lastBoostWallBounceTime = Time.time;
-    }
-
-    // ---------------- GROUND CHECK (wheel-based) ----------------
-    private bool CheckGrounded()
-    {
-        if (wheelTransforms == null || wheelTransforms.Length == 0) return false;
-        bool grounded = false;
-        Vector3 averageNormal = Vector3.zero;
-        int hitCount = 0;
-        float rayLength = suspensionDistance * 2f;
-
-        foreach (Transform wheel in wheelTransforms)
-        {
-            Vector3 origin = wheel.position + Vector3.up * suspensionDistance;
-            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, rayLength, groundLayer))
-            {
-                grounded = true;
-                averageNormal += hit.normal;
-                hitCount++;
-            }
-        }
-
-        if (hitCount > 0) groundHit.normal = averageNormal.normalized;
-        return grounded;
     }
 
     void SetupRamHitbox()
@@ -1534,84 +1764,336 @@ public class CarController : MonoBehaviour, IDamageable
         ramHitbox = box;
     }
 
+    void UpdateRamHitboxSize()
+    {
+        if (ramHitbox == null)
+            return;
+
+        ramHitbox.isTrigger = true;
+        float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
+        float widthCapSpeed = GetMaxSpeedAtFullBoostStacks();
+        float speedRatio = Mathf.Clamp01(speed / Mathf.Max(0.01f, widthCapSpeed));
+        float widthRatio = ramHitboxWidthBySpeed != null ? ramHitboxWidthBySpeed.Evaluate(speedRatio) : speedRatio;
+        widthRatio = Mathf.Clamp01(widthRatio);
+        float forwardRatio = ramHitboxForwardBySpeed != null
+            ? ramHitboxForwardBySpeed.Evaluate(Mathf.Clamp01(speed / Mathf.Max(0.01f, maxSpeed)))
+            : Mathf.Clamp01(speed / Mathf.Max(0.01f, maxSpeed));
+        forwardRatio = Mathf.Clamp01(forwardRatio);
+        float forwardExtension = Mathf.Lerp(0f, ramHitboxMaxForwardExtension, forwardRatio);
+        if (speed > maxSpeed)
+            forwardExtension += (speed - maxSpeed) * ramHitboxForwardExtensionPerExtraSpeed;
+
+        Vector3 size = ramHitboxBaseSize;
+        size.x = Mathf.Lerp(ramHitboxBaseSize.x, ramHitboxMaxWidth, widthRatio);
+        size.z = ramHitboxBaseSize.z + forwardExtension;
+        ramHitbox.size = size;
+
+        Vector3 center = ramHitboxCenter;
+        center.z += forwardExtension * 0.5f;
+        ramHitbox.center = center;
+    }
+
+    public void TryApplyRamImpact(Collider other, Vector3 impactOrigin)
+    {
+        if (isDead || noClipActive || other == null)
+            return;
+        if (other.transform.IsChildOf(transform))
+            return;
+
+        Enemy enemy = other.GetComponentInParent<Enemy>();
+        if (enemy == null || !enemy.IsAlive)
+            return;
+        if (enemy.IsRamDamageImmune)
+            return;
+
+        float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
+        float effectiveMinImpactSpeed = Mathf.Max(minCollisionImpactSpeed, EffectiveRamMinSpeed);
+        if (speed < effectiveMinImpactSpeed)
+            return;
+
+        int enemyId = enemy.GetInstanceID();
+        if (recentEnemyImpactTimeById.TryGetValue(enemyId, out float lastImpactTime) &&
+            Time.time - lastImpactTime < collisionImpactCooldown)
+        {
+            return;
+        }
+
+        recentEnemyImpactTimeById[enemyId] = Time.time;
+        float damageFullSpeed = Mathf.Max(effectiveMinImpactSpeed + 0.01f, maxSpeed);
+        float damageRatio = Mathf.Clamp01((speed - effectiveMinImpactSpeed) / (damageFullSpeed - effectiveMinImpactSpeed));
+        float damage = damageRatio * Mathf.Max(0f, maxCollisionDamage);
+        if (damage > 0f)
+            enemy.TakeDamage(damage, gameObject);
+
+        Vector3 pushDirection = GetEnemyImpactPushDirection(enemy, impactOrigin);
+        float pushPeakSpeed = Mathf.Max(effectiveMinImpactSpeed + 0.01f, collisionPushCurvePeakSpeed);
+        float pushCurveRatio = Mathf.Clamp01((speed - effectiveMinImpactSpeed) / (pushPeakSpeed - effectiveMinImpactSpeed));
+        float pushMultiplier = collisionPushBySpeed != null ? collisionPushBySpeed.Evaluate(pushCurveRatio) : pushCurveRatio;
+        float pushStrength = Mathf.Max(0f, pushMultiplier) * Mathf.Max(0f, maxCollisionPushStrength);
+        if (boostActive)
+            pushStrength = Mathf.Max(pushStrength * boostCollisionPushMultiplier, boostCollisionMinPushStrength);
+
+        enemy.ApplyCarImpact(pushDirection.normalized, pushStrength);
+        ramImpactCount++;
+        EnemyRamImpact?.Invoke();
+
+        if (!boostActive)
+            ApplyNonBoostRamSlowdown();
+    }
+
+    void ApplyNonBoostRamSlowdown()
+    {
+        if (rb == null)
+            return;
+
+        Vector3 velocity = rb.linearVelocity;
+        Vector3 forward = ProjectOnPlaneSafe(transform.forward, Vector3.up);
+        float forwardSpeed = Vector3.Dot(velocity, forward);
+        if (forwardSpeed <= 0f)
+            return;
+
+        float speedLoss = Mathf.Min(
+            forwardSpeed * nonBoostRamForwardSpeedLossPercent,
+            nonBoostRamForwardSpeedLossMax);
+
+        rb.linearVelocity = velocity - forward * speedLoss;
+    }
+
+    Vector3 GetEnemyImpactPushDirection(Enemy enemy, Vector3 impactOrigin)
+    {
+        Vector3 toEnemy = enemy.transform.position - impactOrigin;
+        toEnemy.y = 0f;
+
+        Vector3 forward = ProjectOnPlaneSafe(transform.forward, Vector3.up);
+        Vector3 right = ProjectOnPlaneSafe(transform.right, Vector3.up);
+
+        float sideSign = Mathf.Sign(Vector3.Dot(toEnemy, right));
+        if (Mathf.Abs(sideSign) < 0.001f)
+            sideSign = Random.value < 0.5f ? -1f : 1f;
+
+        Vector3 sideDirection = right * sideSign;
+        Vector3 pushDirection = sideDirection * collisionSidePushWeight + forward * collisionForwardPushWeight;
+        if (pushDirection.sqrMagnitude < 0.0001f)
+            pushDirection = sideDirection;
+
+        float randomYaw = Random.Range(-collisionRandomYawDegrees, collisionRandomYawDegrees);
+        return (Quaternion.AngleAxis(randomYaw, Vector3.up) * pushDirection.normalized).normalized;
+    }
+
+    void SetupAudioSources()
+    {
+        vehicleOneShotSource = AudioPlaybackUtility.EnsureChildAudioSource(
+            transform,
+            "VehicleOneShotAudio",
+            loop: false,
+            playOnAwake: false,
+            spatialBlend: audioSpatialBlend,
+            minDistance: audioMinDistance,
+            maxDistance: audioMaxDistance);
+
+        engineIdleLoopSource = AudioPlaybackUtility.EnsureChildAudioSource(
+            transform,
+            "EngineIdleLoopAudio",
+            loop: true,
+            playOnAwake: false,
+            spatialBlend: audioSpatialBlend,
+            minDistance: audioMinDistance,
+            maxDistance: audioMaxDistance);
+
+        engineLoopSource = AudioPlaybackUtility.EnsureChildAudioSource(
+            transform,
+            "EngineLoopAudio",
+            loop: true,
+            playOnAwake: false,
+            spatialBlend: audioSpatialBlend,
+            minDistance: audioMinDistance,
+            maxDistance: audioMaxDistance);
+
+        wheelRollingLoopSource = AudioPlaybackUtility.EnsureChildAudioSource(
+            transform,
+            "WheelRollingLoopAudio",
+            loop: true,
+            playOnAwake: false,
+            spatialBlend: audioSpatialBlend,
+            minDistance: audioMinDistance,
+            maxDistance: audioMaxDistance);
+    }
+
+    void UpdateVehicleAudio()
+    {
+        if (isDead)
+        {
+            StopAllVehicleAudio();
+            return;
+        }
+
+        float speedRatio = Mathf.Clamp01(CurrentSpeed / Mathf.Max(0.01f, GetMaxSpeedAtFullBoostStacks()));
+        float throttleAmount = Mathf.Abs(moveInput.y);
+        bool hasThrottleInput = throttleAmount >= engineInputThreshold;
+        float runningBlend = Mathf.Clamp01(CurrentPlanarSpeed() / Mathf.Max(0.01f, engineRunningFullVolumeSpeed));
+        if (hasThrottleInput)
+            runningBlend = Mathf.Max(runningBlend, Mathf.Lerp(0.25f, 0.7f, throttleAmount));
+        if (boostActive)
+            runningBlend = Mathf.Max(runningBlend, 0.85f);
+
+        float idleVolume = engineIdleVolume * (1f - runningBlend);
+        float runningVolume = engineLoopVolume * runningBlend;
+        float enginePitch = Mathf.Lerp(engineMinPitch, engineMaxPitch, speedRatio);
+        float wheelPitch = Mathf.Lerp(wheelRollingMinPitch, wheelRollingMaxPitch, speedRatio);
+
+        UpdateLoopSource(engineIdleLoopSource, engineIdleLoopSFX, true, engineIdlePitch, idleVolume, engineAudioFadeSpeed);
+        UpdateLoopSource(engineLoopSource, engineLoopSFX, true, enginePitch, runningVolume, engineAudioFadeSpeed);
+        UpdateLoopSource(wheelRollingLoopSource, wheelRollingLoopSFX, isGrounded && CurrentSpeed >= wheelRollingMinSpeed, wheelPitch, wheelRollingVolume);
+    }
+
+    void UpdateLoopSource(AudioSource source, AudioClip clip, bool shouldPlay, float pitch, float volume, float fadeSpeed = 0f)
+    {
+        if (source == null)
+            return;
+
+        source.pitch = Mathf.Clamp(pitch, 0.1f, 3f);
+        float targetVolume = Mathf.Clamp01(volume);
+        if (fadeSpeed > 0f)
+            source.volume = Mathf.MoveTowards(source.volume, targetVolume, fadeSpeed * Time.fixedDeltaTime);
+        else
+            source.volume = targetVolume;
+
+        if (!shouldPlay || clip == null)
+        {
+            if (source.isPlaying)
+                source.Stop();
+            return;
+        }
+
+        if (source.clip != clip)
+            source.clip = clip;
+
+        if (!source.isPlaying)
+            source.Play();
+    }
+
+    void StopAllVehicleAudio()
+    {
+        if (engineIdleLoopSource != null && engineIdleLoopSource.isPlaying)
+            engineIdleLoopSource.Stop();
+        if (engineLoopSource != null && engineLoopSource.isPlaying)
+            engineLoopSource.Stop();
+        if (wheelRollingLoopSource != null && wheelRollingLoopSource.isPlaying)
+            wheelRollingLoopSource.Stop();
+    }
+
+    void PlayVehicleOneShot(AudioClip clip, float volume, float pitch = 1f, float maxVolumeScale = 1f)
+    {
+        if (clip == null)
+            return;
+
+        if (vehicleOneShotSource == null)
+            SetupAudioSources();
+        if (vehicleOneShotSource == null)
+            return;
+
+        vehicleOneShotSource.pitch = Mathf.Clamp(pitch, 0.1f, 3f);
+        vehicleOneShotSource.PlayOneShot(clip, Mathf.Clamp(volume, 0f, Mathf.Max(0f, maxVolumeScale)));
+    }
+
+    void TryPlayTerrainCollisionSound(Collision collision)
+    {
+        if (collision == null || terrainThumpSFX == null)
+            return;
+        if (Time.time < terrainThumpPlayableAt)
+            return;
+
+        float impact = GetCollisionImpactSpeed(collision);
+        if (impact < terrainCollisionSoundMinImpact)
+            return;
+
+        float pitch = Random.Range(0.9f, 1.08f);
+        terrainThumpPlayableAt = Time.time + GetClipDurationAtPitch(terrainThumpSFX, pitch) + terrainCollisionSoundCooldown;
+        PlayVehicleOneShot(terrainThumpSFX, GetTerrainThumpVolume(impact), pitch, terrainCollisionSoundMaxVolumeScale);
+    }
+
+    float GetTerrainThumpVolume(float impactSpeed)
+    {
+        float fullVolumeImpact = Mathf.Max(terrainCollisionSoundMinImpact + 0.01f, terrainCollisionSoundFullVolumeImpact);
+        float impactRatio = Mathf.InverseLerp(terrainCollisionSoundMinImpact, fullVolumeImpact, impactSpeed);
+        float volumeScale = Mathf.Lerp(terrainCollisionSoundMinVolumeScale, terrainCollisionSoundMaxVolumeScale, impactRatio);
+        return terrainThumpVolume * Mathf.Clamp(volumeScale, 0f, 2f);
+    }
+
+    static float GetClipDurationAtPitch(AudioClip clip, float pitch)
+    {
+        if (clip == null)
+            return 0f;
+
+        return clip.length / Mathf.Max(0.01f, Mathf.Abs(pitch));
+    }
+
+    float GetCollisionImpactSpeed(Collision collision)
+    {
+        float impact = collision.relativeVelocity.magnitude;
+        if (rb == null || collision.contactCount <= 0)
+            return impact;
+
+        Vector3 velocity = rb.linearVelocity;
+        for (int i = 0; i < collision.contactCount; i++)
+        {
+            ContactPoint contact = collision.GetContact(i);
+            impact = Mathf.Max(impact, Mathf.Abs(Vector3.Dot(velocity, contact.normal)));
+        }
+
+        return impact;
+    }
+
     void SetupRuntimeParticles()
     {
         if (!enableRuntimeParticles)
             return;
 
-        if (particleAnchor == null)
+        Transform existingAnchor = transform.Find("VehicleParticles");
+        if (existingAnchor == null)
         {
-            Transform existingAnchor = transform.Find("RuntimeParticles");
-            if (existingAnchor == null)
-            {
-                GameObject anchorObject = new GameObject("RuntimeParticles");
-                anchorObject.transform.SetParent(transform, false);
-                existingAnchor = anchorObject.transform;
-            }
-
+            GameObject anchorObject = new GameObject("VehicleParticles");
+            anchorObject.transform.SetParent(transform, false);
+            particleAnchor = anchorObject.transform;
+        }
+        else
+        {
             particleAnchor = existingAnchor;
         }
 
         UpdateParticleAnchorPose();
 
+        Transform existingDriving = particleAnchor.Find("DrivingDustParticles");
+        drivingDustParticles = existingDriving != null ? existingDriving.GetComponent<ParticleSystem>() : null;
         if (drivingDustParticles == null)
-        {
-            Transform existingDust = particleAnchor.Find("DrivingDustParticles");
-            drivingDustParticles = existingDust != null ? existingDust.GetComponent<ParticleSystem>() : null;
-            if (drivingDustParticles == null)
-                drivingDustParticles = RuntimeParticleFactory.CreateDrivingDust(particleAnchor, "DrivingDustParticles", drivingDustColor);
-        }
+            drivingDustParticles = RuntimeParticleFactory.CreateDrivingDust(particleAnchor, "DrivingDustParticles", drivingDustColor);
 
+        Transform existingBoost = particleAnchor.Find("BoostDustParticles");
+        boostDustParticles = existingBoost != null ? existingBoost.GetComponent<ParticleSystem>() : null;
         if (boostDustParticles == null)
-        {
-            Transform existingBoost = particleAnchor.Find("BoostDustParticles");
-            boostDustParticles = existingBoost != null ? existingBoost.GetComponent<ParticleSystem>() : null;
-            if (boostDustParticles == null)
-                boostDustParticles = RuntimeParticleFactory.CreateBoostDust(particleAnchor, "BoostDustParticles", boostDustColor);
-        }
+            boostDustParticles = RuntimeParticleFactory.CreateBoostDust(particleAnchor, "BoostDustParticles", boostDustColor);
 
+        Transform existingSparkle = particleAnchor.Find("DriftSparkleParticles");
+        driftSparkleParticles = existingSparkle != null ? existingSparkle.GetComponent<ParticleSystem>() : null;
         if (driftSparkleParticles == null)
-        {
-            Transform existingSparkle = particleAnchor.Find("DriftSparkleParticles");
-            driftSparkleParticles = existingSparkle != null ? existingSparkle.GetComponent<ParticleSystem>() : null;
-            if (driftSparkleParticles == null)
-                driftSparkleParticles = RuntimeParticleFactory.CreateDriftSparkles(particleAnchor, "DriftSparkleParticles");
-        }
-
-        StopRuntimeParticles();
+            driftSparkleParticles = RuntimeParticleFactory.CreateDriftSparkles(particleAnchor, "DriftSparkleParticles");
     }
 
     void UpdateRuntimeParticles()
     {
-        if (!enableRuntimeParticles)
-        {
-            StopRuntimeParticles();
+        if (!enableRuntimeParticles || particleAnchor == null)
             return;
-        }
-
-        if (particleAnchor == null || drivingDustParticles == null || boostDustParticles == null || driftSparkleParticles == null)
-            SetupRuntimeParticles();
-
-        if (particleAnchor == null || rb == null || isDead || noClipActive)
-        {
-            StopRuntimeParticles();
-            return;
-        }
 
         UpdateParticleAnchorPose();
-
-        float speed = rb.linearVelocity.magnitude;
-        float maxTrackedSpeed = Mathf.Max(0.01f, GetMaxSpeedAtFullBoostStacks());
-        float speedRatio = Mathf.Clamp01(speed / maxTrackedSpeed);
+        float speed = CurrentSpeed;
+        float speedRatio = Mathf.Clamp01(speed / Mathf.Max(0.01f, GetMaxSpeedAtFullBoostStacks()));
         bool groundedAndMoving = isGrounded && speed >= drivingParticleMinSpeed && moveInput.y > 0.05f;
-        bool boostDustActive = groundedAndMoving && boostActive;
+        float driveRate = Mathf.Lerp(0f, drivingParticleMaxRate, speedRatio);
+        float boostRate = Mathf.Lerp(drivingParticleMaxRate * 0.45f, drivingParticleMaxRate * 1.35f, RemainingBoostRatio);
+        float driftRate = Mathf.Lerp(driftSparkleMaxRate * 0.35f, driftSparkleMaxRate, speedRatio);
 
-        float driveRate = Mathf.Lerp(8f, drivingParticleMaxRate, speedRatio);
-        float boostRate = Mathf.Lerp(12f, drivingParticleMaxRate * 1.25f, speedRatio);
-        float driftRate = Mathf.Lerp(5f, driftSparkleMaxRate, Mathf.Clamp01(driftCharge));
-
-        SetParticleEmission(drivingDustParticles, groundedAndMoving && !boostDustActive, driveRate);
-        SetParticleEmission(boostDustParticles, boostDustActive, boostRate);
+        SetParticleEmission(drivingDustParticles, groundedAndMoving && !boostActive, driveRate);
+        SetParticleEmission(boostDustParticles, groundedAndMoving && boostActive, boostRate);
         SetParticleEmission(driftSparkleParticles, isGrounded && isDrifting, driftRate);
     }
 
@@ -1621,19 +2103,14 @@ public class CarController : MonoBehaviour, IDamageable
             return;
 
         Vector3 localPosition = particleAnchorOffset;
-        if (wheelTransforms != null && wheelTransforms.Length > 0)
+        if (wheelLocalPositions != null && wheelLocalPositions.Length > 0)
         {
             Vector3 rearCenter = Vector3.zero;
             int rearWheelCount = 0;
-
-            for (int i = 0; i < wheelTransforms.Length; i++)
+            for (int i = 0; i < wheelLocalPositions.Length; i++)
             {
-                Transform wheel = wheelTransforms[i];
-                if (wheel == null)
-                    continue;
-
-                Vector3 localWheelPosition = transform.InverseTransformPoint(wheel.position);
-                if (localWheelPosition.z < 0f)
+                Vector3 localWheelPosition = wheelLocalPositions[i];
+                if (localWheelPosition.z < GetSuspensionCenterLocalZ())
                 {
                     rearCenter += localWheelPosition;
                     rearWheelCount++;
@@ -1679,234 +2156,348 @@ public class CarController : MonoBehaviour, IDamageable
             particles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
     }
 
-    void UpdateRamHitboxSize()
+    void EnsureWheelStateCache()
     {
-        if (ramHitbox == null)
-            return;
+        int wheelCount = GetWheelCount();
+        if (wheelStates == null || wheelStates.Length != wheelCount)
+            wheelStates = new WheelState[wheelCount];
+        if (wheelSpinAngles == null || wheelSpinAngles.Length != wheelCount)
+            wheelSpinAngles = new float[wheelCount];
+        if (wheelVisualBaseRotations == null || wheelVisualBaseRotations.Length != wheelCount)
+            wheelVisualBaseRotations = new Quaternion[wheelCount];
+        if (wheelVisualCacheRefs == null || wheelVisualCacheRefs.Length != wheelCount)
+            wheelVisualCacheRefs = new Transform[wheelCount];
 
-        ramHitbox.isTrigger = true;
+        for (int i = 0; i < wheelCount; i++)
+        {
+            Transform visual = GetWheelVisual(i);
+            if (wheelVisualCacheRefs[i] == visual)
+                continue;
 
-        float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
-        float widthCapSpeed = GetMaxSpeedAtFullBoostStacks();
-        float speedRatio = Mathf.Clamp01(speed / Mathf.Max(0.01f, widthCapSpeed));
-        float widthRatio = ramHitboxWidthBySpeed != null ? ramHitboxWidthBySpeed.Evaluate(speedRatio) : speedRatio;
-        widthRatio = Mathf.Clamp01(widthRatio);
-        float forwardRatio = ramHitboxForwardBySpeed != null
-            ? ramHitboxForwardBySpeed.Evaluate(Mathf.Clamp01(speed / Mathf.Max(0.01f, maxSpeed)))
-            : Mathf.Clamp01(speed / Mathf.Max(0.01f, maxSpeed));
-        forwardRatio = Mathf.Clamp01(forwardRatio);
-        float forwardExtension = Mathf.Lerp(0f, ramHitboxMaxForwardExtension, forwardRatio);
-        if (speed > maxSpeed)
-            forwardExtension += (speed - maxSpeed) * ramHitboxForwardExtensionPerExtraSpeed;
-
-        Vector3 size = ramHitboxBaseSize;
-        size.x = Mathf.Lerp(ramHitboxBaseSize.x, ramHitboxMaxWidth, widthRatio);
-        size.z = ramHitboxBaseSize.z + forwardExtension;
-        ramHitbox.size = size;
-
-        Vector3 center = ramHitboxCenter;
-        center.z += forwardExtension * 0.5f; // extend only in front of the base hitbox
-        ramHitbox.center = center;
+            wheelVisualCacheRefs[i] = visual;
+            wheelVisualBaseRotations[i] = visual != null ? visual.localRotation : Quaternion.identity;
+        }
     }
 
-    public void TryApplyRamImpact(Collider other, Vector3 impactOrigin)
+    void EnsureWheelLocalPositions()
     {
-        if (isDead || noClipActive || other == null)
-            return;
+        if (wheelLocalPositions == null || wheelLocalPositions.Length < DefaultWheelCount)
+            wheelLocalPositions = CreateDefaultWheelLocalPositions();
+    }
 
-        if (other.transform.IsChildOf(transform))
-            return;
-
-        Enemy enemy = other.GetComponentInParent<Enemy>();
-        if (enemy == null || !enemy.IsAlive)
-            return;
-        if (enemy.IsRamDamageImmune)
-            return;
-
-        float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
-        float effectiveMinImpactSpeed = Mathf.Max(minCollisionImpactSpeed, EffectiveRamMinSpeed);
-        if (speed < effectiveMinImpactSpeed)
-            return;
-
-        int enemyId = enemy.GetInstanceID();
-        if (recentEnemyImpactTimeById.TryGetValue(enemyId, out float lastImpactTime))
+    Vector3[] CreateDefaultWheelLocalPositions()
+    {
+        float halfTrack = Mathf.Max(0.5f, trackWidth * 0.5f);
+        float halfWheelBase = Mathf.Max(1f, wheelBase * 0.5f);
+        float wheelY = 0.01f;
+        return new[]
         {
-            if (Time.time - lastImpactTime < collisionImpactCooldown)
-                return;
+            new Vector3(-halfTrack, wheelY, halfWheelBase),
+            new Vector3(halfTrack, wheelY, halfWheelBase),
+            new Vector3(-halfTrack, wheelY, -halfWheelBase),
+            new Vector3(halfTrack, wheelY, -halfWheelBase)
+        };
+    }
+
+    int GetWheelCount()
+    {
+        if (wheelLocalPositions != null && wheelLocalPositions.Length > 0)
+            return wheelLocalPositions.Length;
+        if (wheelTransforms != null && wheelTransforms.Length > 0)
+            return wheelTransforms.Length;
+        return DefaultWheelCount;
+    }
+
+    Transform GetWheelTransform(int index)
+    {
+        if (wheelTransforms != null && index >= 0 && index < wheelTransforms.Length)
+            return wheelTransforms[index];
+        return null;
+    }
+
+    Vector3 GetWheelWorldPosition(int index, Vector3 localFallback)
+    {
+        return transform.TransformPoint(localFallback);
+    }
+
+    Vector3 GetWheelLocalPosition(int index)
+    {
+        if (wheelLocalPositions != null && index >= 0 && index < wheelLocalPositions.Length)
+            return wheelLocalPositions[index];
+
+        Transform wheelTransform = GetWheelTransform(index);
+        if (wheelTransform != null)
+            return transform.InverseTransformPoint(wheelTransform.position);
+
+        Vector3[] defaults = CreateDefaultWheelLocalPositions();
+        return defaults[Mathf.Clamp(index, 0, defaults.Length - 1)];
+    }
+
+    void UpdateWheelVisuals()
+    {
+        if (wheelStates == null)
+            return;
+
+        EnsureWheelStateCache();
+        Vector3 spinAxis = wheelSpinAxis.sqrMagnitude > 0.0001f ? wheelSpinAxis.normalized : Vector3.right;
+        float radius = GetSuspensionWheelRadius();
+
+        for (int i = 0; i < wheelStates.Length; i++)
+        {
+            Transform visual = GetWheelVisual(i);
+            if (visual == null)
+                continue;
+
+            WheelState state = wheelStates[i];
+            Transform referenceWheel = GetWheelTransform(i);
+            bool hasExplicitVisual = wheelVisuals != null && i < wheelVisuals.Length && wheelVisuals[i] != null;
+            if (hasExplicitVisual || visual != referenceWheel)
+                visual.position = state.wheelWorldPosition;
+
+            if (!spinOnlyWhenGrounded || state.grounded)
+            {
+                float spinSpeed = state.grounded ? state.forwardSpeed : Vector3.Dot(rb.linearVelocity, transform.forward);
+                wheelSpinAngles[i] += spinSpeed / radius * Mathf.Rad2Deg * Time.fixedDeltaTime * wheelSpinSpeedMultiplier;
+            }
+
+            Quaternion baseRotation = wheelVisualBaseRotations != null && i < wheelVisualBaseRotations.Length
+                ? wheelVisualBaseRotations[i]
+                : visual.localRotation;
+            Quaternion steerRotation = state.isFront
+                ? Quaternion.AngleAxis(currentSteerAngle, Vector3.up)
+                : Quaternion.identity;
+            visual.localRotation = steerRotation * baseRotation * Quaternion.AngleAxis(wheelSpinAngles[i], spinAxis);
+        }
+    }
+
+    Transform GetWheelVisual(int index)
+    {
+        if (wheelVisuals != null && index >= 0 && index < wheelVisuals.Length && wheelVisuals[index] != null)
+            return wheelVisuals[index];
+        if (wheelTransforms != null && index >= 0 && index < wheelTransforms.Length)
+            return wheelTransforms[index];
+        return null;
+    }
+
+    float GetSuspensionRestLength()
+    {
+        return Mathf.Max(0.05f, suspensionDistance);
+    }
+
+    float GetSuspensionWheelRadius()
+    {
+        return Mathf.Max(0.05f, wheelVisualRadius);
+    }
+
+    float GetSuspensionRayLength()
+    {
+        return GetSuspensionRestLength() + GetSuspensionWheelRadius() + Mathf.Max(0f, suspensionProbeSlack);
+    }
+
+    float GetSuspensionCenterLocalZ()
+    {
+        int wheelCount = GetWheelCount();
+        if (wheelCount <= 0)
+            return 0f;
+
+        Vector3 firstWheel = GetWheelLocalPosition(0);
+        float minZ = firstWheel.z;
+        float maxZ = firstWheel.z;
+        for (int i = 1; i < wheelCount; i++)
+        {
+            Vector3 local = GetWheelLocalPosition(i);
+            minZ = Mathf.Min(minZ, local.z);
+            maxZ = Mathf.Max(maxZ, local.z);
         }
 
-        recentEnemyImpactTimeById[enemyId] = Time.time;
-
-        float damageFullSpeed = Mathf.Max(effectiveMinImpactSpeed + 0.01f, maxSpeed);
-        float damageRatio = Mathf.Clamp01((speed - effectiveMinImpactSpeed) / (damageFullSpeed - effectiveMinImpactSpeed));
-        float damage = damageRatio * Mathf.Max(0f, maxCollisionDamage);
-        if (damage > 0f)
-            enemy.TakeDamage(damage, gameObject);
-
-        Vector3 pushDirection = GetEnemyImpactPushDirection(enemy, impactOrigin);
-
-        float pushPeakSpeed = Mathf.Max(effectiveMinImpactSpeed + 0.01f, collisionPushCurvePeakSpeed);
-        float pushCurveRatio = Mathf.Clamp01((speed - effectiveMinImpactSpeed) / (pushPeakSpeed - effectiveMinImpactSpeed));
-        float pushMultiplier = collisionPushBySpeed != null ? collisionPushBySpeed.Evaluate(pushCurveRatio) : pushCurveRatio;
-        float pushStrength = Mathf.Max(0f, pushMultiplier) * Mathf.Max(0f, maxCollisionPushStrength);
-        if (boostActive)
-            pushStrength = Mathf.Max(pushStrength * boostCollisionPushMultiplier, boostCollisionMinPushStrength);
-        enemy.ApplyCarImpact(pushDirection.normalized, pushStrength);
-        ramImpactCount++;
-        EnemyRamImpact?.Invoke();
-
-        if (!boostActive)
-            ApplyNonBoostRamSlowdown();
+        return (minZ + maxZ) * 0.5f;
     }
 
-    void ApplyNonBoostRamSlowdown()
+    float GetAverageWheelLocalY()
+    {
+        int wheelCount = GetWheelCount();
+        if (wheelCount <= 0)
+            return 0f;
+
+        float total = 0f;
+        for (int i = 0; i < wheelCount; i++)
+            total += GetWheelLocalPosition(i).y;
+
+        return total / wheelCount;
+    }
+
+    float GetMeasuredWheelBase()
+    {
+        int wheelCount = GetWheelCount();
+        if (wheelCount <= 1)
+            return Mathf.Max(0.5f, wheelBase);
+
+        Vector3 firstWheel = GetWheelLocalPosition(0);
+        float minZ = firstWheel.z;
+        float maxZ = firstWheel.z;
+        for (int i = 1; i < wheelCount; i++)
+        {
+            Vector3 local = GetWheelLocalPosition(i);
+            minZ = Mathf.Min(minZ, local.z);
+            maxZ = Mathf.Max(maxZ, local.z);
+        }
+
+        return Mathf.Max(0.5f, maxZ - minZ);
+    }
+
+    float CurrentPlanarSpeed()
     {
         if (rb == null)
-            return;
+            return 0f;
 
         Vector3 velocity = rb.linearVelocity;
-        Vector3 forward = transform.forward;
-        forward.y = 0f;
-        if (forward.sqrMagnitude < 0.0001f)
-            return;
-
-        forward.Normalize();
-        float forwardSpeed = Vector3.Dot(velocity, forward);
-        if (forwardSpeed <= 0f)
-            return;
-
-        float speedLoss = Mathf.Min(
-            forwardSpeed * nonBoostRamForwardSpeedLossPercent,
-            nonBoostRamForwardSpeedLossMax);
-
-        rb.linearVelocity = velocity - forward * speedLoss;
+        velocity.y = 0f;
+        return velocity.magnitude;
     }
 
-    void AddBoostStack()
+    static Vector3 ProjectOnPlaneSafe(Vector3 vector, Vector3 normal)
     {
-        float stackDuration = GetConfiguredBoostStackDuration();
-        int stackCap = GetBoostStackCap();
-        bool wasBoostActive = boostActive;
-        int previousBoostStacks = currentBoostStacks;
-
-        currentBoostStacks = Mathf.Min(currentBoostStacks + 1, stackCap);
-        boostTimer = stackDuration;
-        boostActive = true;
-
-        if (currentBoostStacks != previousBoostStacks)
-            BoostStackGained?.Invoke();
-
-        if (!wasBoostActive)
-            BoostActivated?.Invoke();
-    }
-
-    float GetTotalActiveBoostAmount()
-    {
-        return Mathf.Max(0f, boostSpeedPerStack) * Mathf.Max(0, currentBoostStacks);
-    }
-
-    float GetMaxSpeedAtFullBoostStacks()
-    {
-        float perStackBoost = Mathf.Max(0f, boostSpeedPerStack);
-        int stackCap = GetBoostStackCap();
-        return maxSpeed + perStackBoost * stackCap;
-    }
-
-    float GetConfiguredBoostStackDuration()
-    {
-        float minDuration = Mathf.Clamp(minBoostStackDuration, 0.01f, 5f);
-        return Mathf.Max(minDuration, driftBoostDuration);
-    }
-
-    int GetBoostStackCap()
-    {
-        // Older scene data may have serialized this as 1 from an earlier clamp bug.
-        return maxBoostStacks <= 1 ? 3 : Mathf.Clamp(maxBoostStacks, 1, 3);
-    }
-
-    Vector3 GetEnemyImpactPushDirection(Enemy enemy, Vector3 impactOrigin)
-    {
-        Vector3 toEnemy = enemy.transform.position - impactOrigin;
-        toEnemy.y = 0f;
-
-        Vector3 forward = transform.forward;
-        forward.y = 0f;
-        if (forward.sqrMagnitude < 0.0001f)
-            forward = Vector3.forward;
-        else
-            forward.Normalize();
-
-        Vector3 right = transform.right;
-        right.y = 0f;
-        if (right.sqrMagnitude < 0.0001f)
-            right = Vector3.right;
-        else
-            right.Normalize();
-
-        float sideSign = Mathf.Sign(Vector3.Dot(toEnemy, right));
-        if (Mathf.Abs(sideSign) < 0.001f)
-            sideSign = Random.value < 0.5f ? -1f : 1f;
-
-        Vector3 sideDirection = right * sideSign;
-        Vector3 pushDirection = sideDirection * collisionSidePushWeight + forward * collisionForwardPushWeight;
-        if (pushDirection.sqrMagnitude < 0.0001f)
-            pushDirection = sideDirection;
-
-        float randomYaw = Random.Range(-collisionRandomYawDegrees, collisionRandomYawDegrees);
-        pushDirection = Quaternion.AngleAxis(randomYaw, Vector3.up) * pushDirection.normalized;
-        return pushDirection.normalized;
-    }
-
-    // ---------------- DEBUG DRAW ----------------
-    private void OnDrawGizmosSelected()
-    {
-        if (!Application.isPlaying)
+        Vector3 projected = Vector3.ProjectOnPlane(vector, normal);
+        if (projected.sqrMagnitude < 0.0001f)
         {
-            if (wheelTransforms != null)
-            {
-                Gizmos.color = Color.yellow;
-                foreach (var w in wheelTransforms) if (w != null) Gizmos.DrawSphere(w.position, debugSphereSize * 0.8f);
-            }
-            return;
+            projected = Vector3.ProjectOnPlane(vector, Vector3.up);
+            if (projected.sqrMagnitude < 0.0001f)
+                projected = Vector3.forward;
         }
 
-        if (wheelTransforms != null && showSuspensionRays)
+        return projected.normalized;
+    }
+
+    float GetEffectiveAccelerationForce() => accelerationForce > 100f ? 28f : accelerationForce;
+    float GetEffectiveVehicleMass() => vehicleMass < 50f ? 900f : vehicleMass;
+    float GetEffectiveWheelBase()
+    {
+        float measuredWheelBase = GetMeasuredWheelBase();
+        if (autoCalculatePhysics || wheelBase < 1f)
+            return measuredWheelBase;
+
+        return Mathf.Max(0.5f, wheelBase);
+    }
+    float GetEffectiveSuspensionStiffness() => suspensionStiffness < 1000f ? 32000f * suspensionStiffnessScale : suspensionStiffness;
+    float GetEffectiveSuspensionDamping() => suspensionDamping < 100f ? 4500f * suspensionDampingScale : suspensionDamping;
+    float GetEffectiveSuspensionMaxForce() => suspensionMaxForcePerWheel < 1000f ? 18000f : suspensionMaxForcePerWheel;
+    float GetEffectiveTireGrip() => (tireGrip < 5f ? 28f : tireGrip) * gripScale;
+    float GetEffectiveTireGripSpeedFalloff() => tireGripSpeedFalloff > 1f ? 0.2f : tireGripSpeedFalloff;
+    float GetEffectiveFrontRollingResistance() => (frontRollingResistance < 0.05f ? 0.45f : frontRollingResistance) * rollingResistanceScale;
+    float GetEffectiveRearRollingResistance() => (rearRollingResistance < 0.05f ? 0.38f : rearRollingResistance) * rollingResistanceScale;
+    float GetEffectiveFrontCoastDrag() => (frontCoastDrag < 0.05f ? 0.55f : frontCoastDrag) * rollingResistanceScale;
+    float GetEffectiveRearCoastDrag() => (rearCoastDrag < 0.05f ? 0.45f : rearCoastDrag) * rollingResistanceScale;
+    float GetEffectiveBrakeForce() => brakeForce < 5f ? 38f : brakeForce;
+    float GetEffectiveDriftSideForce() => driftSideForce > 100f ? 10f : driftSideForce;
+    float GetEffectiveDriftYawTorque() => driftYawTorque > 25f ? 4.5f : driftYawTorque;
+    float GetEffectiveTurnYawAssist() => yawAssist + Mathf.Clamp(turnSpeed * 0.01f, 0f, 3f);
+    float GetEffectiveDownforce() => groundedDownforce > 25f ? 8f : groundedDownforce;
+    float GetEffectiveLeaveGroundBoost() => leaveGroundForwardBoost > 5f ? 0.75f : leaveGroundForwardBoost;
+    float GetEffectiveLeaveGroundUpBoost() => (boostActive ? boostLeaveGroundUpBoost : leaveGroundUpBoost);
+    float GetEffectiveAirGravityMultiplier() => airGravityMultiplier > 1.3f ? 0.85f : airGravityMultiplier;
+    float GetEffectiveFallGravityMultiplier() => fallGravityMultiplier > 1.6f ? 1.15f : fallGravityMultiplier;
+    float GetEffectiveGroundAngularDamping() => groundAngularDamping > 8f ? 2.5f : groundAngularDamping;
+    float GetEffectiveAirAngularDamping() => airAngularDamping > 2f ? 0.65f : airAngularDamping;
+
+    private void OnDrawGizmosSelected()
+    {
+        EnsureWheelLocalPositions();
+        float restLength = Mathf.Max(0.05f, suspensionDistance);
+        float rayLength = GetSuspensionRayLength();
+        float wheelRadius = Mathf.Max(0.01f, wheelGizmoRadius);
+        Vector3 springUp = transform.up.sqrMagnitude > 0.0001f ? transform.up : Vector3.up;
+        Vector3 springDown = -springUp;
+
+        if (showSuspensionRays || showWheelPhysicsGizmos)
         {
-            float rayLength = suspensionDistance * 2f;
-            foreach (var w in wheelTransforms)
+            float physicsWheelRadius = GetSuspensionWheelRadius();
+            float gizmoRadius = Mathf.Max(0.01f, wheelGizmoRadius);
+            float suspensionRayLength = GetSuspensionRestLength() + physicsWheelRadius + Mathf.Max(0f, suspensionProbeSlack);
+
+            for (int i = 0; i < GetWheelCount(); i++)
             {
-                if (w == null) continue;
-                Vector3 origin = w.position + Vector3.up * suspensionDistance;
-                if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, rayLength, groundLayer))
+                Vector3 local;
+                Vector3 wheelPosition;
+                Vector3 origin;
+                RaycastHit hit;
+                float springLength;
+
+                Vector3 wheelUp = springUp;
+                bool hitGround = TryProbeWheelContact(i, wheelUp, restLength, physicsWheelRadius, out local, out wheelPosition, out origin, out hit, out springLength);
+                Vector3 rayEnd = hitGround ? hit.point : origin + (-wheelUp) * suspensionRayLength;
+                Vector3 wheelForward = ProjectOnPlaneSafe(transform.forward, hitGround ? hit.normal : wheelUp);
+                Vector3 wheelRight = ProjectOnPlaneSafe(transform.right, hitGround ? hit.normal : wheelUp);
+
+                if (showSuspensionRays)
                 {
-                    Gizmos.color = Color.yellow;
-                    Gizmos.DrawLine(origin, hit.point);
+                    Gizmos.color = hitGround ? Color.yellow : Color.gray;
+                    Gizmos.DrawLine(origin, rayEnd);
+                    Gizmos.DrawSphere(wheelPosition, debugSphereSize * 0.75f);
+                }
+
+                if (showWheelPhysicsGizmos)
+                {
+                    Gizmos.color = hitGround ? wheelContactColor : wheelAirColor;
+                    Gizmos.DrawWireSphere(wheelPosition, gizmoRadius);
+                    Gizmos.DrawLine(origin, wheelPosition);
+                    DrawGizmoArrow(wheelPosition, wheelForward * physicsWheelRadius * 1.6f, wheelForwardColor);
+                    DrawGizmoArrow(wheelPosition, wheelRight * physicsWheelRadius * 1.2f, lateralForceColor);
+                }
+
+                if (hitGround)
+                {
                     Gizmos.DrawSphere(hit.point, debugSphereSize);
                     if (showSurfaceNormals)
                     {
-                        float a = Vector3.Angle(hit.normal, Vector3.up);
-                        Gizmos.color = a <= maxDriveSlopeAngle ? driveableColor : steepColor;
+                        float angle = Vector3.Angle(hit.normal, Vector3.up);
+                        Gizmos.color = angle <= maxDriveSlopeAngle ? driveableColor : steepColor;
                         Gizmos.DrawLine(hit.point, hit.point + hit.normal * 0.5f);
                     }
-                }
-                else
-                {
-                    Gizmos.color = Color.gray;
-                    Gizmos.DrawLine(origin, origin + Vector3.down * rayLength);
                 }
             }
         }
 
-        if (groundHit.normal != Vector3.zero && showSurfaceNormals)
+        if (Application.isPlaying && showWheelPhysicsGizmos && wheelStates != null)
         {
-            Vector3 pos = transform.position + Vector3.up * 0.5f;
-            float a = Vector3.Angle(groundHit.normal, Vector3.up);
-            Gizmos.color = a <= maxDriveSlopeAngle ? driveableColor : steepColor;
-            Gizmos.DrawLine(pos, pos + groundHit.normal * 1.0f);
-            Gizmos.DrawSphere(pos + groundHit.normal * 1.0f, debugSphereSize * 0.6f);
+            for (int i = 0; i < wheelStates.Length; i++)
+            {
+                WheelState state = wheelStates[i];
+                Vector3 wheelPosition = state.wheelWorldPosition;
+                Vector3 contactPosition = state.grounded ? state.hitPoint : wheelPosition;
+
+                Gizmos.color = state.grounded ? wheelContactColor : wheelAirColor;
+                Gizmos.DrawWireSphere(wheelPosition, wheelRadius);
+                Gizmos.DrawSphere(wheelPosition, debugSphereSize * 0.55f);
+
+                if (!state.grounded)
+                    continue;
+
+                Gizmos.DrawLine(state.rayOrigin, state.hitPoint);
+                Gizmos.DrawSphere(state.hitPoint, debugSphereSize);
+
+                float compressionOffset = Mathf.Lerp(0.08f, 0.32f, Mathf.Clamp01(state.compression));
+                Gizmos.color = springForceColor;
+                Gizmos.DrawWireSphere(wheelPosition + state.springDirection * compressionOffset, debugSphereSize * 0.75f);
+
+                float springAcceleration = state.springForce / Mathf.Max(1f, rb != null ? rb.mass : vehicleMass);
+                DrawGizmoArrow(contactPosition, state.springDirection * springAcceleration * forceGizmoScale, springForceColor);
+                DrawGizmoArrow(contactPosition, state.wheelRight * state.lateralAcceleration * forceGizmoScale, lateralForceColor);
+                DrawGizmoArrow(contactPosition, state.wheelForward * state.driveAcceleration * forceGizmoScale, driveForceColor);
+                DrawGizmoArrow(contactPosition, state.wheelForward * state.rollingAcceleration * forceGizmoScale, Color.white);
+                DrawGizmoArrow(wheelPosition, state.wheelForward * wheelRadius * 1.75f, wheelForwardColor);
+            }
         }
 
-        if (lastSampleHadHits)
+        if (Application.isPlaying && groundHit.normal != Vector3.zero && showSurfaceNormals)
+        {
+            Vector3 pos = transform.position + Vector3.up * 0.5f;
+            float angle = Vector3.Angle(groundHit.normal, Vector3.up);
+            Gizmos.color = angle <= maxDriveSlopeAngle ? driveableColor : steepColor;
+            Gizmos.DrawLine(pos, pos + groundHit.normal);
+            Gizmos.DrawSphere(pos + groundHit.normal, debugSphereSize * 0.6f);
+        }
+
+        if (Application.isPlaying && lastSampleHadHits)
         {
             Gizmos.color = Color.cyan;
             Gizmos.DrawSphere(lastFrontSample, debugSphereSize * 1.2f);
@@ -1915,63 +2506,23 @@ public class CarController : MonoBehaviour, IDamageable
             Gizmos.color = absAngle <= maxDriveSlopeAngle ? Color.green : Color.red;
             Gizmos.DrawLine(lastFrontSample + Vector3.up * 0.02f, lastBackSample + Vector3.up * 0.02f);
         }
-
-        // DrawAutoSteerGizmos(); // Auto-steer temporarily disabled for build stabilization.
     }
 
-#if false // Auto-steer temporarily disabled for build stabilization.
-    private void DrawAutoSteerGizmos()
+    static void DrawGizmoArrow(Vector3 start, Vector3 vector, Color color)
     {
-        if (!showAutoSteerGizmos || !autoSteerDebugActive)
+        if (vector.sqrMagnitude < 0.000001f)
             return;
 
-        Vector3 direction = autoSteerDebugDirection;
-        if (direction.sqrMagnitude < 0.0001f)
-            return;
-        direction.Normalize();
+        Vector3 end = start + vector;
+        Vector3 direction = vector.normalized;
+        float headLength = Mathf.Min(0.35f, vector.magnitude * 0.25f);
+        Quaternion rotation = Quaternion.LookRotation(direction, Vector3.up);
+        Vector3 headRight = rotation * Quaternion.Euler(0f, 155f, 0f) * Vector3.forward;
+        Vector3 headLeft = rotation * Quaternion.Euler(0f, -155f, 0f) * Vector3.forward;
 
-        Vector3 origin = autoSteerDebugOrigin == Vector3.zero ? rb.worldCenterOfMass : autoSteerDebugOrigin;
-        float lookAhead = Mathf.Max(0.05f, autoSteerDebugLookAhead);
-        Vector3 end = origin + direction * lookAhead;
-
-        Color pathColor = Color.cyan;
-        if (autoSteerDebugSuppressedByPlayer)
-            pathColor = Color.magenta;
-        else if (autoSteerDebugSuppressedBySpeed)
-            pathColor = Color.gray;
-
-        Gizmos.color = pathColor;
-        Gizmos.DrawLine(origin, end);
-        Gizmos.DrawWireSphere(origin, autoSteerProbeRadius);
-        Gizmos.DrawWireSphere(end, autoSteerProbeRadius * 0.65f);
-
-        if (!autoSteerDebugHasWallHit)
-            return;
-
-        float markerSize = Mathf.Lerp(debugSphereSize * 1.4f, debugSphereSize * 2.8f, autoSteerDebugDanger);
-        Gizmos.color = new Color(1f, 0.45f, 0.2f, 1f);
-        Gizmos.DrawSphere(autoSteerDebugWallPoint, markerSize);
-
-        Vector3 wallNormal = autoSteerDebugWallNormal;
-        if (wallNormal.sqrMagnitude > 0.0001f)
-        {
-            wallNormal.Normalize();
-            Gizmos.DrawLine(autoSteerDebugWallPoint, autoSteerDebugWallPoint + wallNormal * 1.2f);
-        }
-
-        if (Mathf.Abs(autoSteerDebugSteerSign) <= 0.001f)
-            return;
-
-        Vector3 flatNormal = autoSteerDebugWallNormal;
-        flatNormal.y = 0f;
-        if (flatNormal.sqrMagnitude < 0.0001f)
-            return;
-        flatNormal.Normalize();
-
-        Vector3 tangent = Vector3.Cross(flatNormal, Vector3.up).normalized * Mathf.Sign(autoSteerDebugSteerSign);
-        float turnLength = Mathf.Lerp(0.8f, 1.6f, autoSteerDebugDanger);
-        Gizmos.color = autoSteerDebugSteerSign < 0f ? Color.green : Color.yellow;
-        Gizmos.DrawLine(autoSteerDebugWallPoint, autoSteerDebugWallPoint + tangent * turnLength);
+        Gizmos.color = color;
+        Gizmos.DrawLine(start, end);
+        Gizmos.DrawLine(end, end + headRight * headLength);
+        Gizmos.DrawLine(end, end + headLeft * headLength);
     }
-#endif
 }

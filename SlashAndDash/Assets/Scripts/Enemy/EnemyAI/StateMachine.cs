@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
@@ -109,6 +110,29 @@ sealed class EnemyAIExitRule
     }
 }
 
+public enum EnemyAIEventType
+{
+    AttackWindup,
+    AttackStrike,
+    ProjectileFired
+}
+
+public readonly struct EnemyAIEvent
+{
+    public EnemyAIEventType Type { get; }
+    public EnemyAIState State { get; }
+    public Transform Target { get; }
+    public Transform Owner { get; }
+
+    public EnemyAIEvent(EnemyAIEventType type, EnemyAIState state, Transform target, Transform owner)
+    {
+        Type = type;
+        State = state;
+        Target = target;
+        Owner = owner;
+    }
+}
+
 [RequireComponent(typeof(Rigidbody), typeof(NavMeshAgent))]
 public class StateMachine : MonoBehaviour
 {
@@ -128,6 +152,7 @@ public class StateMachine : MonoBehaviour
 
     public EnemyAIState CurrentState => currentState;
     public bool IsTransitionLocked => transitionLock;
+    public event Action<EnemyAIEvent> AIEventRaised;
 
     void Awake()
     {
@@ -180,6 +205,11 @@ public class StateMachine : MonoBehaviour
     public void SetTransitionLock(bool shouldLock)
     {
         transitionLock = shouldLock;
+    }
+
+    public void RaiseAIEvent(EnemyAIEventType eventType, EnemyAIState state, Transform target = null)
+    {
+        AIEventRaised?.Invoke(new EnemyAIEvent(eventType, state, target, transform));
     }
 
     void BuildRuntimeGraph()

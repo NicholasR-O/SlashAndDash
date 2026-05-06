@@ -13,7 +13,10 @@ public sealed class AttackState : EnemyAIState
     Transform owner;
     NavMeshAgent agent;
     Transform target;
+    Enemy enemy;
     float nextAttackAt;
+    float nextWindupAt;
+    bool windupTriggered;
 
     public Transform Target => target;
 
@@ -22,13 +25,14 @@ public sealed class AttackState : EnemyAIState
         base.Initialize(machine);
         owner = machine.transform;
         agent = machine.GetComponent<NavMeshAgent>();
+        enemy = machine.GetComponent<Enemy>();
     }
 
     public override void Enter(EnemyAIConditionResult transitionData)
     {
         if (transitionData.Target != null)
             target = transitionData.Target;
-        nextAttackAt = Time.time + Mathf.Max(0f, attackWindup);
+        ScheduleNextAttack(Mathf.Max(0f, attackWindup));
         StopAgent();
     }
 
@@ -42,11 +46,20 @@ public sealed class AttackState : EnemyAIState
         if (target == null)
             return;
 
+        if (!windupTriggered && Time.time >= nextWindupAt)
+            TriggerWindup();
+
         if (Time.time < nextAttackAt)
             return;
 
-        nextAttackAt = Time.time + attackCooldown;
-        TryDealDamage();
+        bool attacked = TryDealDamage();
+        if (attacked && enemy != null)
+        {
+            enemy.OnAttackStrike(target);
+            Machine.RaiseAIEvent(EnemyAIEventType.AttackStrike, this, target);
+        }
+
+        ScheduleNextAttack(Mathf.Max(0f, attackCooldown));
     }
 
     public override void Exit()
@@ -64,22 +77,41 @@ public sealed class AttackState : EnemyAIState
         agent.isStopped = true;
     }
 
-    void TryDealDamage()
+    bool TryDealDamage()
     {
         if (owner == null || target == null || attackDamage <= 0f)
-            return;
+            return false;
 
-        Vector3 delta = target.position - owner.position;
-        if (horizontalDistanceOnly)
-            delta.y = 0f;
-
-        if (delta.magnitude > Mathf.Max(0f, attackRange))
-            return;
+        float distance = TargetingUtility.GetColliderDistance(owner, target, horizontalDistanceOnly);
+        if (distance > Mathf.Max(0f, attackRange))
+            return false;
 
         IDamageable damageable = DamageUtility.FindDamageable(target);
         if (damageable == null || !damageable.IsAlive)
-            return;
+            return false;
 
         damageable.TakeDamage(attackDamage, owner.gameObject);
+        return true;
+    }
+
+    void ScheduleNextAttack(float delay)
+    {
+        float windup = Mathf.Max(0f, attackWindup);
+        nextAttackAt = Time.time + Mathf.Max(0f, delay);
+        nextWindupAt = nextAttackAt - windup;
+        windupTriggered = windup <= 0f;
+
+        if (!windupTriggered && Time.time >= nextWindupAt)
+            TriggerWindup();
+    }
+
+    void TriggerWindup()
+    {
+        windupTriggered = true;
+        if (enemy != null)
+        {
+            enemy.OnAttackWindup(Mathf.Max(0f, attackWindup), target);
+            Machine.RaiseAIEvent(EnemyAIEventType.AttackWindup, this, target);
+        }
     }
 }

@@ -44,9 +44,20 @@ public class ArenaTrigger : MonoBehaviour
 
     bool hasTriggered;
     bool isShuttingDown;
+    bool countedAsActiveArena;
     Transform cachedPlayer;
     ArenaSpawner activeSpawner;
     Collider triggerCollider;
+
+    static int activePlayerArenaCount;
+
+    public static bool PlayerIsInArena => activePlayerArenaCount > 0;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetActiveArenaState()
+    {
+        activePlayerArenaCount = 0;
+    }
 
     void Awake()
     {
@@ -70,6 +81,7 @@ public class ArenaTrigger : MonoBehaviour
 
         cachedPlayer = other.attachedRigidbody != null ? other.attachedRigidbody.transform : other.transform;
         hasTriggered = true;
+        MarkArenaActive();
 
         if (triggerCollider != null)
             triggerCollider.enabled = false;
@@ -82,6 +94,7 @@ public class ArenaTrigger : MonoBehaviour
         if (!TrySpawnWalls())
         {
             Debug.LogWarning("ArenaTrigger failed to spawn walls due to missing wall prefab.", this);
+            MarkArenaInactive();
             yield break;
         }
 
@@ -90,6 +103,7 @@ public class ArenaTrigger : MonoBehaviour
         if (arenaSpawnerPrefab == null)
         {
             Debug.LogWarning("ArenaTrigger has no ArenaSpawner prefab assigned.", this);
+            MarkArenaInactive();
             yield break;
         }
 
@@ -245,7 +259,31 @@ public class ArenaTrigger : MonoBehaviour
         }
 
         spawnedWalls.Clear();
+        MarkArenaInactive();
         Destroy(gameObject);
+    }
+
+    void OnDestroy()
+    {
+        MarkArenaInactive();
+    }
+
+    void MarkArenaActive()
+    {
+        if (countedAsActiveArena)
+            return;
+
+        countedAsActiveArena = true;
+        activePlayerArenaCount++;
+    }
+
+    void MarkArenaInactive()
+    {
+        if (!countedAsActiveArena)
+            return;
+
+        countedAsActiveArena = false;
+        activePlayerArenaCount = Mathf.Max(0, activePlayerArenaCount - 1);
     }
 
     void OnValidate()
