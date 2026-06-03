@@ -10,15 +10,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 3fb1b73998da81d4190dba980c50ffef, type: 3}
       propertyPath: m_LocalScale.x
-      value: 2
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 3fb1b73998da81d4190dba980c50ffef, type: 3}
       propertyPath: m_LocalScale.y
-      value: 2
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 3fb1b73998da81d4190dba980c50ffef, type: 3}
       propertyPath: m_LocalScale.z
-      value: 2
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 3fb1b73998da81d4190dba980c50ffef, type: 3}
       propertyPath: m_LocalPosition.x
@@ -60,6 +60,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 3fb1b73998da81d4190dba980c50ffef, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 3fb1b73998da81d4190dba980c50ffef, type: 3}
       propertyPath: m_Name
       value: Tree2
@@ -71,7 +75,15 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 3fb1b73998da81d4190dba980c50ffef, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6966987244843363514}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 3fb1b73998da81d4190dba980c50ffef, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8135727994044433333}
   m_SourcePrefab: {fileID: 100100000, guid: 3fb1b73998da81d4190dba980c50ffef, type: 3}
+--- !u!23 &7463826388616704589 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 3fb1b73998da81d4190dba980c50ffef, type: 3}
+  m_PrefabInstance: {fileID: 8094449778639630025}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &8976847228069008280 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 3fb1b73998da81d4190dba980c50ffef, type: 3}
@@ -96,5 +108,24 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 3.9803252, y: 20, z: 2.1827466}
-  m_Center: {x: 0.15934688, y: 10, z: 0.14656344}
+  m_Size: {x: 0.8, y: 20, z: 0.8}
+  m_Center: {x: 0.02, y: 10, z: 0.14656344}
+--- !u!205 &8135727994044433333
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8976847228069008280}
+  serializedVersion: 2
+  m_LocalReferencePoint: {x: 0.15934682, y: 2.7356806, z: 0.14656341}
+  m_Size: 5.8480244
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.08
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 7463826388616704589}
+  m_Enabled: 1

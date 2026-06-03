@@ -207,6 +207,20 @@ public class StateMachine : MonoBehaviour
         transitionLock = shouldLock;
     }
 
+    public bool TryEnterChaseState()
+    {
+        foreach (EnemyAIState state in runtimeStatesByPrefab.Values)
+        {
+            if (state is ChaseState)
+            {
+                ChangeState(state, EnemyAIConditionResult.NoTrigger(), forceReenter: true);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void RaiseAIEvent(EnemyAIEventType eventType, EnemyAIState state, Transform target = null)
     {
         AIEventRaised?.Invoke(new EnemyAIEvent(eventType, state, target, transform));
@@ -389,9 +403,9 @@ public class StateMachine : MonoBehaviour
         return runtimeState;
     }
 
-    void ChangeState(EnemyAIState nextState, EnemyAIConditionResult transitionData)
+    void ChangeState(EnemyAIState nextState, EnemyAIConditionResult transitionData, bool forceReenter = false)
     {
-        if (nextState == null || nextState == currentState)
+        if (nextState == null || (nextState == currentState && !forceReenter))
             return;
 
         currentState?.Exit();

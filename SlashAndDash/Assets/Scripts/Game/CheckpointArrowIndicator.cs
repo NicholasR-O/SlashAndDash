@@ -4,12 +4,12 @@ using UnityEngine;
 public class CheckpointArrowIndicator : MonoBehaviour
 {
     [SerializeField] private Transform player;
-    [SerializeField] private float hoverHeight = 3f;
+    [SerializeField] private float hoverHeight = 1.85f;
     [SerializeField] private float arrowLength = 1.8f;
     [SerializeField] private float arrowWidth = 0.95f;
     [SerializeField] private float shaftWidth = 0.36f;
     [SerializeField] private float arrowThickness = 0.08f;
-    [SerializeField] private Color arrowColor = new Color(1f, 0.82f, 0.12f, 1f);
+    [SerializeField] private Color arrowColor = new Color(1f, 0.08f, 0.04f, 1f);
     [SerializeField] private bool hideInArena = true;
 
     private Transform target;
@@ -162,6 +162,11 @@ public class CheckpointArrowIndicator : MonoBehaviour
         };
         mesh.vertices = vertices;
         mesh.triangles = triangles;
+        Color[] colors = new Color[vertices.Length];
+        for (int i = 0; i < colors.Length; i++)
+            colors[i] = arrowColor;
+
+        mesh.colors = colors;
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
         return mesh;
@@ -172,7 +177,9 @@ public class CheckpointArrowIndicator : MonoBehaviour
         if (arrowMaterial != null)
             return arrowMaterial;
 
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        Shader shader = Shader.Find("Sprites/Default");
+        if (shader == null)
+            shader = Shader.Find("Universal Render Pipeline/Unlit");
         if (shader == null)
             shader = Shader.Find("Unlit/Color");
         if (shader == null)

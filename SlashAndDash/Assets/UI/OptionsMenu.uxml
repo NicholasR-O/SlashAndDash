@@ -6,30 +6,91 @@
     xsi:noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd"
 >
     <Style src="project://database/Assets/UI/OptionsMenuStyleSheet.uss?fileID=7433441132597879392&amp;guid=1a87e8ed856fd41469553d848ed8673b&amp;type=3#OptionsMenuStyleSheet" />
-    <ui:VisualElement name="options-root" class="options-root">
-        <ui:VisualElement name="options-panel" class="options-panel">
-            <ui:Label text="Options" class="options-title" />
-            <ui:VisualElement class="option-row">
-                <ui:Label text="Sensitivity" class="option-label" />
-                <ui:Slider name="sensitivity-slider" class="sensitivity-slider" />
-                <ui:Label name="sensitivity-value" text="1.00" class="option-value" />
-            </ui:VisualElement>
-            <ui:Button name="quit-button" text="Quit" class="quit-button" />
+    <ui:VisualElement name="options-root" class="menu-root">
+        <ui:VisualElement name="options-backdrop-image" class="menu-backdrop-image" />
+        <ui:VisualElement name="options-panel" class="menu-panel options-panel">
+            <ui:ScrollView name="options-scroll" class="menu-scroll">
+                <ui:VisualElement class="menu-header">
+                    <ui:Label text="Paused" class="menu-title" />
+                    <ui:Label text="Options" class="menu-subtitle" />
+                </ui:VisualElement>
+                <ui:VisualElement class="option-section">
+                    <ui:VisualElement class="option-row">
+                        <ui:Label text="Sensitivity" class="option-label" />
+                        <ui:Slider name="sensitivity-slider" class="menu-slider" />
+                        <ui:Label name="sensitivity-value" text="1.00" class="option-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="option-row">
+                        <ui:Label text="FOV" class="option-label" />
+                        <ui:Slider name="fov-slider" class="menu-slider" />
+                        <ui:Label name="fov-value" text="70" class="option-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="option-row">
+                        <ui:Label text="Brightness" class="option-label" />
+                        <ui:Slider name="brightness-slider" class="menu-slider" />
+                        <ui:Label name="brightness-value" text="1.00x" class="option-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="option-row ui-scale-row">
+                        <ui:Label text="UI Scale" class="option-label ui-scale-label" />
+                        <ui:VisualElement class="ui-scale-button-group">
+                            <ui:Button name="ui-scale-button-1" text="1" class="ui-scale-button" />
+                            <ui:Button name="ui-scale-button-2" text="2" class="ui-scale-button" />
+                            <ui:Button name="ui-scale-button-3" text="3" class="ui-scale-button" />
+                            <ui:Button name="ui-scale-button-4" text="4" class="ui-scale-button" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:Toggle name="auto-aim-toggle" text="Auto-Aim" class="menu-toggle" />
+                </ui:VisualElement>
+                <ui:Label text="Volume" class="section-title" />
+                <ui:VisualElement class="option-section">
+                    <ui:VisualElement class="option-row">
+                        <ui:Label text="Master" class="option-label" />
+                        <ui:Slider name="master-volume-slider" class="menu-slider" />
+                        <ui:Label name="master-volume-value" text="100%" class="option-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="option-row">
+                        <ui:Label text="Music" class="option-label" />
+                        <ui:Slider name="music-volume-slider" class="menu-slider" />
+                        <ui:Label name="music-volume-value" text="85%" class="option-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="option-row">
+                        <ui:Label text="Sound Effects" class="option-label" />
+                        <ui:Slider name="sfx-volume-slider" class="menu-slider" />
+                        <ui:Label name="sfx-volume-value" text="100%" class="option-value" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="menu-footer">
+                    <ui:Button name="resume-button" text="Resume" class="menu-button primary-button" />
+                    <ui:Button name="quit-button" text="Quit" class="menu-button" />
+                </ui:VisualElement>
+            </ui:ScrollView>
         </ui:VisualElement>
     </ui:VisualElement>
-    <ui:VisualElement name="debug-root" class="options-root">
-        <ui:VisualElement name="debug-panel" class="options-panel">
-            <ui:Label text="Debug" class="options-title" />
-            <ui:Toggle name="debug-god-mode-toggle" text="God Mode" class="debug-toggle" />
-            <ui:Toggle name="debug-no-clip-toggle" text="No-Clip" class="debug-toggle" />
-            <ui:Toggle name="debug-disable-ai-toggle" text="Disable AI" class="debug-toggle" />
-            <ui:Toggle name="debug-show-suspension-toggle" text="Show Suspension Rays" class="debug-toggle" />
-            <ui:Toggle name="debug-show-normals-toggle" text="Show Surface Normals" class="debug-toggle" />
-            <ui:Toggle name="debug-always-boost-toggle" text="Always Boost" class="debug-toggle" />
+    <ui:VisualElement name="debug-root" class="menu-root debug-root">
+        <ui:VisualElement name="debug-panel" class="menu-panel debug-panel">
+            <ui:ScrollView name="debug-scroll" class="menu-scroll">
+                <ui:VisualElement class="menu-header">
+                    <ui:Label text="Cheats" class="menu-title" />
+                    <ui:Label text="Debug switches" class="menu-subtitle" />
+                </ui:VisualElement>
+                <ui:VisualElement class="debug-grid">
+                    <ui:Toggle name="debug-god-mode-toggle" text="God Mode" class="debug-toggle" />
+                    <ui:Toggle name="debug-no-clip-toggle" text="No-Clip" class="debug-toggle" />
+                    <ui:Toggle name="debug-disable-ai-toggle" text="Disable AI" class="debug-toggle" />
+                    <ui:Toggle name="debug-always-boost-toggle" text="Always Boost" class="debug-toggle" />
+                    <ui:Toggle name="debug-killer-ram-toggle" text="Killer Ram" class="debug-toggle" />
+                </ui:VisualElement>
+                <ui:Label text="Teleport" class="section-title" />
+                <ui:VisualElement class="teleport-row">
+                    <ui:DropdownField name="debug-teleport-destination-dropdown" class="debug-dropdown" />
+                    <ui:Button name="debug-teleport-button" text="Teleport" class="menu-button primary-button teleport-button" />
+                </ui:VisualElement>
+                <ui:Label name="debug-teleport-status" class="debug-status" />
+            </ui:ScrollView>
         </ui:VisualElement>
     </ui:VisualElement>
     <ui:VisualElement name="game-over-root" class="game-over-root">
-        <ui:VisualElement class="game-over-panel">
+        <ui:VisualElement name="game-over-panel" class="game-over-panel">
             <ui:Label text="GAME OVER" class="game-over-title" />
             <ui:Label text="Rebooting run..." class="game-over-subtitle" />
         </ui:VisualElement>

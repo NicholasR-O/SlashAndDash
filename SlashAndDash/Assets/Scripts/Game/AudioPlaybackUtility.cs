@@ -53,7 +53,7 @@ public static class AudioPlaybackUtility
 
         AudioSource source = audioObject.AddComponent<AudioSource>();
         source.clip = clip;
-        source.volume = Mathf.Clamp01(volume);
+        source.volume = Mathf.Clamp01(volume * GameOptions.SoundEffectsVolume);
         source.pitch = Mathf.Clamp(pitch, -3f, 3f);
         source.spatialBlend = Mathf.Clamp01(spatialBlend);
         source.minDistance = Mathf.Max(0.01f, minDistance);

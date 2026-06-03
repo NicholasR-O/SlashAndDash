@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4148606801079469306}
   - component: {fileID: 271068343595060554}
+  - component: {fileID: 7294818499347531771}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -48,3 +49,28 @@ MonoBehaviour:
   hudDocument: {fileID: 0}
   lockCursorWhenPlaying: 1
   pauseTimeScale: 1
+--- !u!114 &7294818499347531771
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3854707608012344767}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b0fd6a892ed4b3fa5934eacd723d140, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: 
+  drivingTrack: {fileID: 8300000, guid: 55b5ec5ebb9d1004b9d4c64dd476656b, type: 3}
+  arenaTrack: {fileID: 8300000, guid: 7ae978a5e23a7a449b8b04d778a83d29, type: 3}
+  levelTracks:
+  - sceneName: Level1
+    drivingTrack: {fileID: 8300000, guid: 55b5ec5ebb9d1004b9d4c64dd476656b, type: 3}
+    arenaTrack: {fileID: 8300000, guid: 7ae978a5e23a7a449b8b04d778a83d29, type: 3}
+  - sceneName: Level2
+    drivingTrack: {fileID: 8300000, guid: b52d6ad64a127d74bb08591b7180ccf8, type: 3}
+    arenaTrack: {fileID: 8300000, guid: 7ae978a5e23a7a449b8b04d778a83d29, type: 3}
+  masterVolume: 0.75
+  fadeDuration: 1.25
+  sceneTransitionFadePower: 1.4
+  playWhilePaused: 1

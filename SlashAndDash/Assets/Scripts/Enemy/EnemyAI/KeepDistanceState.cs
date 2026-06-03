@@ -4,16 +4,19 @@ using UnityEngine.AI;
 [CreateAssetMenu(menuName = "Enemy AI/States/Keep Distance State", fileName = "KeepDistanceState")]
 public sealed class KeepDistanceState : EnemyAIState
 {
-    [SerializeField] float moveSpeed = 4.25f;
+    [SerializeField] float moveSpeed = 6.75f;
     [SerializeField] float minDistance = 6f;
     [SerializeField] float maxDistance = 9f;
     [SerializeField] float retreatDistance = 4f;
     [SerializeField] float repathDistance = 0.35f;
     [SerializeField] float sampleRadius = 2f;
     [SerializeField] float faceTargetTurnSpeed = 10f;
+    [SerializeField] bool autoAcquirePlayer = true;
+    [SerializeField] string playerTag = "Player";
 
     Transform owner;
     NavMeshAgent agent;
+    Enemy enemy;
     Transform target;
     Vector3 lastDestination;
     bool hasDestination;
@@ -25,12 +28,15 @@ public sealed class KeepDistanceState : EnemyAIState
         base.Initialize(machine);
         owner = machine.transform;
         agent = machine.GetComponent<NavMeshAgent>();
+        enemy = machine.GetComponent<Enemy>();
     }
 
     public override void Enter(EnemyAIConditionResult transitionData)
     {
         if (transitionData.Target != null)
             target = transitionData.Target;
+        else
+            TryAutoAcquireTarget();
 
         ConfigureAgent();
         UpdateDestination(force: true);
@@ -49,8 +55,12 @@ public sealed class KeepDistanceState : EnemyAIState
 
         if (target == null)
         {
-            StopAgent();
-            return;
+            TryAutoAcquireTarget();
+            if (target == null)
+            {
+                StopAgent();
+                return;
+            }
         }
 
         FaceTarget();
@@ -67,8 +77,15 @@ public sealed class KeepDistanceState : EnemyAIState
         if (!CanUseAgent())
             return;
 
-        agent.speed = moveSpeed;
+        float scaledSpeed = GetMoveSpeed();
+        agent.speed = scaledSpeed;
+        agent.acceleration = Mathf.Max(agent.acceleration, scaledSpeed * 2f);
         agent.isStopped = false;
+    }
+
+    float GetMoveSpeed()
+    {
+        return moveSpeed * (enemy != null ? enemy.MovementSpeedScale : 1f);
     }
 
     void UpdateDestination(bool force)
@@ -147,6 +164,16 @@ public sealed class KeepDistanceState : EnemyAIState
     bool CanUseAgent()
     {
         return agent != null && agent.enabled && agent.isOnNavMesh;
+    }
+
+    void TryAutoAcquireTarget()
+    {
+        if (!autoAcquirePlayer || target != null || string.IsNullOrEmpty(playerTag))
+            return;
+
+        GameObject player = GameObject.FindGameObjectWithTag(playerTag);
+        if (player != null)
+            target = player.transform;
     }
 
     void FaceTarget()

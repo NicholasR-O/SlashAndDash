@@ -5,41 +5,368 @@
     top: 0;
     bottom: 0;
     pointer-events: none;
-    padding-left: 20px;
-    padding-bottom: 20px;
+    padding-left: 14px;
+    padding-bottom: 18px;
     align-items: flex-start;
     justify-content: flex-end;
 }
 
 .hud-panel {
-    padding: 0;
-}
-
-.gauge-stack {
     position: relative;
-    width: 206px;
-    height: 206px;
-    border-top-left-radius: 103px;
-    border-top-right-radius: 103px;
-    border-bottom-right-radius: 103px;
-    border-bottom-left-radius: 103px;
-    background-color: rgba(6, 12, 20, 0.18);
+    width: 31%;
+    max-width: 600px;
+    min-width: 340px;
+    min-height: 168px;
+    padding-top: 10px;
+    padding-right: 12px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+    flex-direction: row;
+    align-items: flex-end;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-left-width: 3px;
     border-top-width: 1px;
     border-right-width: 1px;
     border-bottom-width: 1px;
-    border-left-width: 1px;
-    border-top-color: rgba(130, 176, 230, 0.25);
-    border-right-color: rgba(130, 176, 230, 0.25);
-    border-bottom-color: rgba(130, 176, 230, 0.25);
-    border-left-color: rgba(130, 176, 230, 0.25);
+    border-left-color: rgba(255, 220, 112, 0.72);
+    border-top-color: rgba(255, 255, 255, 0.14);
+    border-right-color: rgba(255, 255, 255, 0.1);
+    border-bottom-color: rgba(69, 185, 236, 0.34);
+    background-color: rgba(6, 10, 15, 0.64);
 }
 
-.circular-gauge {
+.hud-panel-image {
     position: absolute;
     left: 0;
     right: 0;
     top: 0;
     bottom: 0;
+    opacity: 0.82;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    -unity-background-scale-mode: scale-and-crop;
+}
+
+.speedometer {
+    position: relative;
+    width: 146px;
+    height: 146px;
+    flex-shrink: 0;
+}
+
+.speedometer-background-image {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    opacity: 0.9;
+    border-top-left-radius: 73px;
+    border-top-right-radius: 73px;
+    border-bottom-right-radius: 73px;
+    border-bottom-left-radius: 73px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.speedometer-face {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 4px;
+    bottom: 4px;
+    border-top-left-radius: 69px;
+    border-top-right-radius: 69px;
+    border-bottom-right-radius: 69px;
+    border-bottom-left-radius: 69px;
+    background-color: rgba(5, 9, 14, 0.76);
+    border-top-width: 2px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+    border-left-width: 2px;
+    border-top-color: rgba(229, 238, 247, 0.3);
+    border-right-color: rgba(229, 238, 247, 0.16);
+    border-bottom-color: rgba(69, 185, 236, 0.36);
+    border-left-color: rgba(255, 220, 112, 0.38);
+}
+
+.speedometer-arc {
+    position: absolute;
+    left: 13px;
+    right: 13px;
+    top: 13px;
+    bottom: 13px;
+    border-top-left-radius: 56px;
+    border-top-right-radius: 56px;
+    border-bottom-right-radius: 56px;
+    border-bottom-left-radius: 56px;
+    border-top-width: 4px;
+    border-right-width: 4px;
+    border-bottom-width: 4px;
+    border-left-width: 4px;
+    border-top-color: rgba(255, 229, 145, 0.55);
+    border-right-color: rgba(69, 185, 236, 0.62);
+    border-bottom-color: rgba(69, 185, 236, 0.12);
+    border-left-color: rgba(255, 229, 145, 0.28);
+}
+
+.speedometer-inner-shadow {
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    top: 28px;
+    bottom: 28px;
+    border-top-left-radius: 45px;
+    border-top-right-radius: 45px;
+    border-bottom-right-radius: 45px;
+    border-bottom-left-radius: 45px;
+    background-color: rgba(0, 0, 0, 0.28);
+}
+
+.speedometer-needle {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.speedometer-needle-image {
+    position: absolute;
+    left: 61px;
+    top: 15px;
+    width: 24px;
+    height: 68px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.speedometer-needle-fallback {
+    position: absolute;
+    left: 70px;
+    top: 23px;
+    width: 6px;
+    height: 58px;
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+    border-bottom-left-radius: 3px;
+    background-color: rgb(255, 231, 136);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.7);
+    border-right-color: rgba(255, 255, 255, 0.28);
+    border-bottom-color: rgba(0, 0, 0, 0.28);
+    border-left-color: rgba(255, 255, 255, 0.28);
+}
+
+.speedometer-hub {
+    position: absolute;
+    left: 59px;
+    top: 59px;
+    width: 28px;
+    height: 28px;
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-right-radius: 14px;
+    border-bottom-left-radius: 14px;
+    background-color: rgb(20, 26, 34);
+    border-top-width: 2px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+    border-left-width: 2px;
+    border-top-color: rgba(255, 255, 255, 0.45);
+    border-right-color: rgba(255, 255, 255, 0.24);
+    border-bottom-color: rgba(69, 185, 236, 0.5);
+    border-left-color: rgba(255, 220, 112, 0.45);
+}
+
+.speedometer-value {
+    position: absolute;
+    left: 34px;
+    right: 34px;
+    bottom: 24px;
+    height: 28px;
+    color: rgb(246, 250, 255);
+    font-size: 24px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    letter-spacing: 0;
+}
+
+.hud-bars {
+    position: relative;
+    flex-grow: 1;
+    min-width: 0;
+    margin-left: 12px;
+    margin-bottom: 16px;
+    flex-direction: column;
+}
+
+.hud-bar-row {
+    min-width: 0;
+    margin-top: 7px;
+    flex-direction: column;
+}
+
+.hud-bar-header {
+    min-height: 20px;
+    flex-direction: row;
+    align-items: center;
+}
+
+.hud-bar-label {
+    flex-grow: 1;
+    color: rgba(229, 238, 247, 0.84);
+    font-size: 12px;
+    -unity-font-style: bold;
+    letter-spacing: 0;
+}
+
+.hud-bar-value {
+    min-width: 46px;
+    color: rgb(255, 229, 145);
+    font-size: 14px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-right;
+    letter-spacing: 0;
+}
+
+.boost-value {
+    color: rgb(142, 218, 255);
+}
+
+.hud-bar-track {
+    position: relative;
+    min-width: 0;
+    height: 27px;
+    margin-top: 2px;
+    overflow: hidden;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.2);
+    border-right-color: rgba(255, 255, 255, 0.12);
+    border-bottom-color: rgba(0, 0, 0, 0.36);
+    border-left-color: rgba(255, 255, 255, 0.16);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.health-bar-track {
+    background-color: rgba(56, 18, 22, 0.56);
+}
+
+.boost-bar-track {
+    background-color: rgba(10, 22, 34, 0.74);
+}
+
+.hud-bar-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    border-top-left-radius: 3px;
+    border-bottom-left-radius: 3px;
+}
+
+.health-fill {
+    background-color: rgb(107, 230, 132);
+}
+
+.boost-layer {
+    background-color: rgb(108, 211, 255);
+}
+
+.boost-layer-one {
+    opacity: 0.95;
+}
+
+.boost-layer-two {
+    opacity: 0.96;
+}
+
+.boost-layer-three {
+    opacity: 1;
+}
+
+.hud-bar-overlay-image {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    opacity: 0.88;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.boost-marker {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 3px;
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+    border-bottom-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+    background-color: rgba(255, 255, 255, 0.88);
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-left-color: rgba(4, 9, 14, 0.55);
+    border-right-color: rgba(4, 9, 14, 0.55);
+}
+
+.boost-marker-final {
+    background-color: rgba(255, 231, 136, 0.95);
+}
+
+.arena-counter-container {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -78px;
+    align-items: center;
+    justify-content: flex-start;
+    opacity: 0;
+    display: none;
+    -unity-background-scale-mode: scale-and-crop;
+}
+
+.arena-counter-text {
+    min-width: 280px;
+    min-height: 42px;
+    padding-top: 8px;
+    padding-right: 22px;
+    padding-bottom: 8px;
+    padding-left: 22px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-top-width: 2px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+    border-left-width: 2px;
+    border-top-color: rgba(255, 220, 105, 0.82);
+    border-right-color: rgba(255, 220, 105, 0.82);
+    border-bottom-color: rgba(79, 179, 235, 0.64);
+    border-left-color: rgba(255, 220, 105, 0.82);
+    background-color: rgba(11, 15, 24, 0.84);
+    color: rgb(255, 239, 181);
+    font-size: 24px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    letter-spacing: 0;
 }
 
 .tutorial-container {
@@ -50,6 +377,7 @@
     align-items: center;
     justify-content: flex-start;
     display: none;
+    -unity-background-scale-mode: scale-and-crop;
 }
 
 .tutorial-text {
@@ -59,21 +387,55 @@
     padding-right: 18px;
     padding-bottom: 10px;
     padding-left: 18px;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-    border-bottom-right-radius: 10px;
-    border-bottom-left-radius: 10px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    border-bottom-left-radius: 8px;
     border-top-width: 1px;
     border-right-width: 1px;
     border-bottom-width: 1px;
-    border-left-width: 1px;
-    border-top-color: rgba(255, 255, 255, 0.35);
-    border-right-color: rgba(255, 255, 255, 0.35);
-    border-bottom-color: rgba(255, 255, 255, 0.35);
-    border-left-color: rgba(255, 255, 255, 0.35);
-    background-color: rgba(8, 14, 24, 0.78);
+    border-left-width: 3px;
+    border-top-color: rgba(255, 255, 255, 0.28);
+    border-right-color: rgba(255, 255, 255, 0.18);
+    border-bottom-color: rgba(79, 179, 235, 0.42);
+    border-left-color: rgba(255, 220, 112, 0.82);
+    background-color: rgba(8, 14, 24, 0.8);
     color: rgb(235, 241, 255);
     font-size: 19px;
     -unity-text-align: middle-center;
     white-space: normal;
+}
+
+.hud-compact {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-bottom: 10px;
+}
+
+.hud-compact .hud-panel {
+    width: 96%;
+    max-width: 520px;
+    min-width: 0;
+    min-height: 150px;
+    padding-top: 8px;
+    padding-right: 8px;
+    padding-bottom: 8px;
+    padding-left: 8px;
+}
+
+.hud-compact .hud-bars {
+    margin-left: 8px;
+    margin-bottom: 10px;
+}
+
+.hud-compact .arena-counter-text {
+    min-width: 0;
+    max-width: 92%;
+    font-size: 19px;
+    white-space: normal;
+}
+
+.hud-compact .tutorial-text {
+    max-width: 92%;
+    font-size: 16px;
 }

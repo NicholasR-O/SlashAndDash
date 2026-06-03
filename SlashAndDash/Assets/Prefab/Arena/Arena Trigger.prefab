@@ -77,8 +77,16 @@ MonoBehaviour:
   wallSpawnDepth: 18
   wallRiseDuration: 0.35
   wallRiseStagger: 0.01
-  wallDropDuration: 0.3
-  wallDropStagger: 0.005
+  wallDropDuration: 0.85
+  wallDropStagger: 0.018
+  wallFallOutwardDistance: 5.25
+  wallFallDownDistance: 2.35
+  wallFallAngle: 96
+  wallFallImpactOutwardOvershoot: 0.65
+  wallFallImpactDownOvershoot: 0.35
+  wallFallImpactAngleOvershoot: 6
+  wallFallSettleDuration: 0.22
+  wallFallLingerDuration: 1.1
   wallRiseCurve:
     serializedVersion: 2
     m_Curve:

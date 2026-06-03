@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b148d54ca6b57142877bb57d5759061, type: 3}
   m_Name: WizardTooFarCondition
   m_EditorClassIdentifier: 
-  distanceThreshold: 10.5
+  distanceThreshold: 52
   horizontalOnly: 1
   triggerWhenWithin: 0

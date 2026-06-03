@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c313bf18cc244ee8b8405dbbd7355ee, type: 3}
   m_Name: KeepDistanceState
   m_EditorClassIdentifier: 
-  moveSpeed: 4.25
+  moveSpeed: 6.75
   minDistance: 6
   maxDistance: 9
   retreatDistance: 4

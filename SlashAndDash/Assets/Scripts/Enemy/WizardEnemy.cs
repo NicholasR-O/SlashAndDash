@@ -4,15 +4,16 @@ using UnityEngine.AI;
 [RequireComponent(typeof(Rigidbody), typeof(NavMeshAgent))]
 public class WizardEnemy : BasicEnemy
 {
-    [Header("Wizard Projectile")]
+    [Header("Projectile")]
     [SerializeField] private WizardProjectile projectilePrefab;
     [SerializeField] private Transform projectileSpawn;
     [SerializeField] private float projectileSpeed = 8f;
-    [SerializeField] private float projectileLifetime = 6f;
-    [SerializeField] private float aimHeightOffset = 0.9f;
+    [SerializeField] private float projectileLifetime = 8f;
+    [SerializeField] private float aimHeightOffset = 0.55f;
+    [SerializeField, Range(0f, 1f)] private float projectileLaunchUpwardBias = 0.25f;
 
-    [Header("Wizard Audio")]
-    [SerializeField] private AudioClip wizardAttackSFX;
+    [Header("Projectile Audio")]
+    [SerializeField] private AudioClip projectileAttackSFX;
 
     private void Reset()
     {
@@ -23,7 +24,16 @@ public class WizardEnemy : BasicEnemy
 
     protected override AudioClip GetAttackAudioClip()
     {
-        return wizardAttackSFX;
+        return projectileAttackSFX;
+    }
+
+    protected override void OnValidate()
+    {
+        base.OnValidate();
+        projectileSpeed = Mathf.Max(0.01f, projectileSpeed);
+        projectileLifetime = Mathf.Max(0.01f, projectileLifetime);
+        aimHeightOffset = Mathf.Max(0f, aimHeightOffset);
+        projectileLaunchUpwardBias = Mathf.Clamp01(projectileLaunchUpwardBias);
     }
 
     public bool FireProjectile(Transform target)
@@ -38,14 +48,24 @@ public class WizardEnemy : BasicEnemy
 
         direction.Normalize();
         Vector3 origin = GetAimOrigin(direction);
+        direction = GetLaunchDirection(direction);
 
         WizardProjectile projectile = Instantiate(
             projectilePrefab,
             origin,
             Quaternion.LookRotation(direction, Vector3.up));
 
-        projectile.Initialize(direction, damage, gameObject, projectileSpeed, projectileLifetime);
+        projectile.Initialize(direction, damage, gameObject, target, projectileSpeed, projectileLifetime);
         return true;
+    }
+
+    private Vector3 GetLaunchDirection(Vector3 aimDirection)
+    {
+        if (projectileLaunchUpwardBias <= 0f)
+            return aimDirection;
+
+        Vector3 launchDirection = aimDirection + Vector3.up * projectileLaunchUpwardBias;
+        return launchDirection.sqrMagnitude > 0.0001f ? launchDirection.normalized : aimDirection;
     }
 
     private Vector3 GetAimPoint(Transform target)
@@ -70,8 +90,7 @@ public class WizardEnemy : BasicEnemy
         Vector3 normalizedDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : transform.forward;
         Bounds ownerBounds = GetOwnerBounds();
         float forwardClearance = Mathf.Max(ownerBounds.extents.x, ownerBounds.extents.z) + GetProjectileRadius() + 0.15f;
-        Vector3 baseOrigin = ownerBounds.center;
-        baseOrigin.y = Mathf.Max(baseOrigin.y, transform.position.y + aimHeightOffset);
+        Vector3 baseOrigin = transform.position + Vector3.up * aimHeightOffset;
         return baseOrigin + normalizedDirection * forwardClearance;
     }
 

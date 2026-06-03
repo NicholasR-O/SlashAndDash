@@ -69,3 +69,14 @@ MonoBehaviour:
   player: {fileID: 0}
   minSensitivity: 0.1
   maxSensitivity: 3
+  hoverClips:
+  - {fileID: 8300000, guid: b523023c4dcbbd34f92c2f772b8f25f4, type: 3}
+  - {fileID: 8300000, guid: 39be482c2434557409316b09460db912, type: 3}
+  - {fileID: 8300000, guid: 6db440ff9b24adc43a8e159d36cb152b, type: 3}
+  - {fileID: 8300000, guid: dbdf9fd0aa24c9849aa659313d674cd0, type: 3}
+  clickClips:
+  - {fileID: 8300000, guid: a47a0f05cbfcf1148b27950b80604ff8, type: 3}
+  - {fileID: 8300000, guid: a845b93fadfb11e41b11ee17bb764f0b, type: 3}
+  - {fileID: 8300000, guid: 0b8246a470bc01a44860d034b098c2e6, type: 3}
+  - {fileID: 8300000, guid: 27ae62ea566532548806ff9508457178, type: 3}
+  sliderClip: {fileID: 8300000, guid: 757db570f17615d479eec20fcce33274, type: 3}

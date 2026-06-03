@@ -79,7 +79,8 @@ public sealed class AttackState : EnemyAIState
 
     bool TryDealDamage()
     {
-        if (owner == null || target == null || attackDamage <= 0f)
+        float damageAmount = enemy != null ? enemy.Damage : attackDamage;
+        if (owner == null || target == null || damageAmount <= 0f)
             return false;
 
         float distance = TargetingUtility.GetColliderDistance(owner, target, horizontalDistanceOnly);
@@ -90,7 +91,7 @@ public sealed class AttackState : EnemyAIState
         if (damageable == null || !damageable.IsAlive)
             return false;
 
-        damageable.TakeDamage(attackDamage, owner.gameObject);
+        damageable.TakeDamage(damageAmount, owner.gameObject);
         return true;
     }
 

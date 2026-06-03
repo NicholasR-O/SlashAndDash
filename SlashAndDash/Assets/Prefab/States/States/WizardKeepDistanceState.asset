@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c313bf18cc244ee8b8405dbbd7355ee, type: 3}
   m_Name: WizardKeepDistanceState
   m_EditorClassIdentifier: 
-  moveSpeed: 4.25
-  minDistance: 6.5
-  maxDistance: 9
-  retreatDistance: 5
+  moveSpeed: 6.75
+  minDistance: 18
+  maxDistance: 26
+  retreatDistance: 12
   repathDistance: 0.35
   sampleRadius: 2
   faceTargetTurnSpeed: 12

@@ -68,6 +68,7 @@ public class GameManager : MonoBehaviour
 
         if (pauseTimeScale)
             Time.timeScale = 1f;
+        AudioListener.pause = false;
 
         menuInputActions?.Dispose();
     }
@@ -114,6 +115,7 @@ public class GameManager : MonoBehaviour
 
         if (pauseTimeScale)
             Time.timeScale = blockGameplay ? 0f : 1f;
+        AudioListener.pause = paused || debugMenu;
 
         if (optionsMenu != null)
         {
@@ -193,9 +195,9 @@ public class GameManager : MonoBehaviour
 
         Scene activeScene = SceneManager.GetActiveScene();
         if (activeScene.buildIndex >= 0)
-            SceneManager.LoadScene(activeScene.buildIndex);
+            SceneTransitionFader.LoadScene(activeScene.buildIndex);
         else
-            SceneManager.LoadScene(activeScene.name);
+            SceneTransitionFader.LoadScene(activeScene.name);
     }
 
     private void StopGameOverReloadRoutine()

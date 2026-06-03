@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a72be9c1b467044fa7cf74e6549f1b8, type: 3}
   m_Name: WanderState
   m_EditorClassIdentifier: 
-  moveSpeed: 3.5
+  moveSpeed: 5.25
   stoppingDistance: 0.2
   turnSpeed: 8
   wanderRadius: 20

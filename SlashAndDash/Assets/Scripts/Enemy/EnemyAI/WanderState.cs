@@ -4,7 +4,7 @@ using UnityEngine.AI;
 [CreateAssetMenu(menuName = "Enemy AI/States/Wander State", fileName = "WanderState")]
 public sealed class WanderState : EnemyAIState
 {
-    [SerializeField] float moveSpeed = 3.5f;
+    [SerializeField] float moveSpeed = 5.25f;
     [SerializeField] float stoppingDistance = 0.2f;
     [SerializeField] float wanderRadius = 20f;
     [SerializeField] float maxDistanceFromSpawn = 30f;
@@ -13,6 +13,7 @@ public sealed class WanderState : EnemyAIState
 
     Transform owner;
     NavMeshAgent agent;
+    Enemy enemy;
     Vector3 spawnPosition;
     Vector3 destination;
 
@@ -21,6 +22,7 @@ public sealed class WanderState : EnemyAIState
         base.Initialize(machine);
         owner = machine.transform;
         agent = machine.GetComponent<NavMeshAgent>();
+        enemy = machine.GetComponent<Enemy>();
         spawnPosition = owner.position;
     }
 
@@ -58,9 +60,16 @@ public sealed class WanderState : EnemyAIState
         if (!CanUseAgent())
             return;
 
-        agent.speed = moveSpeed;
+        float scaledSpeed = GetMoveSpeed();
+        agent.speed = scaledSpeed;
+        agent.acceleration = Mathf.Max(agent.acceleration, scaledSpeed * 2f);
         agent.stoppingDistance = stoppingDistance;
         agent.isStopped = false;
+    }
+
+    float GetMoveSpeed()
+    {
+        return moveSpeed * (enemy != null ? enemy.MovementSpeedScale : 1f);
     }
 
     void SetNewDestination()

@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b148d54ca6b57142877bb57d5759061, type: 3}
   m_Name: WizardAttackRangeCondition
   m_EditorClassIdentifier: 
-  distanceThreshold: 8.75
+  distanceThreshold: 45
   horizontalOnly: 1
   triggerWhenWithin: 1

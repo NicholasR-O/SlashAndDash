@@ -4,11 +4,14 @@ using UnityEngine.AI;
 [CreateAssetMenu(menuName = "Enemy AI/States/Chase State", fileName = "ChaseState")]
 public sealed class ChaseState : EnemyAIState
 {
-    [SerializeField] float moveSpeed = 4.25f;
+    [SerializeField] float moveSpeed = 6.75f;
     [SerializeField] float stoppingDistance = 1.25f;
     [SerializeField] float repathDistance = 0.25f;
+    [SerializeField] bool autoAcquirePlayer = true;
+    [SerializeField] string playerTag = "Player";
 
     NavMeshAgent agent;
+    Enemy enemy;
     Transform target;
 
     public Transform Target => target;
@@ -17,12 +20,15 @@ public sealed class ChaseState : EnemyAIState
     {
         base.Initialize(machine);
         agent = machine.GetComponent<NavMeshAgent>();
+        enemy = machine.GetComponent<Enemy>();
     }
 
     public override void Enter(EnemyAIConditionResult transitionData)
     {
         if (transitionData.Target != null)
             target = transitionData.Target;
+        else
+            TryAutoAcquireTarget();
 
         ConfigureAgent();
         UpdateDestination(force: true);
@@ -41,8 +47,12 @@ public sealed class ChaseState : EnemyAIState
 
         if (target == null)
         {
-            StopAgent();
-            return;
+            TryAutoAcquireTarget();
+            if (target == null)
+            {
+                StopAgent();
+                return;
+            }
         }
 
         UpdateDestination(force: false);
@@ -58,9 +68,16 @@ public sealed class ChaseState : EnemyAIState
         if (!CanUseAgent())
             return;
 
-        agent.speed = moveSpeed;
+        float scaledSpeed = GetMoveSpeed();
+        agent.speed = scaledSpeed;
+        agent.acceleration = Mathf.Max(agent.acceleration, scaledSpeed * 2f);
         agent.stoppingDistance = stoppingDistance;
         agent.isStopped = false;
+    }
+
+    float GetMoveSpeed()
+    {
+        return moveSpeed * (enemy != null ? enemy.MovementSpeedScale : 1f);
     }
 
     void UpdateDestination(bool force)
@@ -84,6 +101,16 @@ public sealed class ChaseState : EnemyAIState
     bool CanUseAgent()
     {
         return agent != null && agent.enabled && agent.isOnNavMesh;
+    }
+
+    void TryAutoAcquireTarget()
+    {
+        if (!autoAcquirePlayer || target != null || string.IsNullOrEmpty(playerTag))
+            return;
+
+        GameObject player = GameObject.FindGameObjectWithTag(playerTag);
+        if (player != null)
+            target = player.transform;
     }
 
     void StopAgent()

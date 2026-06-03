@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f8df517d26ee2704ab86a6592d895da5, type: 3}
   m_Name: ChaseState
   m_EditorClassIdentifier: 
-  moveSpeed: 4.25
+  moveSpeed: 6.75
   stoppingDistance: 1.25
   turnSpeed: 8

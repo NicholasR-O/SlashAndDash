@@ -144,6 +144,8 @@ public static class TargetingUtility
 
 public class Enemy : MonoBehaviour, IDamageable
 {
+    const float DefaultExplosionVisualRadius = 4f;
+
     [Header("Stats")]
     [SerializeField] protected float maxHealth = 50f;
     [SerializeField] protected float size = 1f;
@@ -154,6 +156,7 @@ public class Enemy : MonoBehaviour, IDamageable
     [Header("Behavior Flags")]
     [SerializeField] protected bool explosionCanHarmPlayer;
     [SerializeField] protected bool canBeGrappled = true;
+    [SerializeField] protected bool explodeOnDeath;
 
     [Header("Health Bar")]
     [SerializeField] protected bool showHealthBar = true;
@@ -170,6 +173,9 @@ public class Enemy : MonoBehaviour, IDamageable
     [Header("Effects")]
     [SerializeField] protected GameObject explosionVFX;
     [SerializeField] protected AudioClip explosionSFX;
+    [SerializeField] protected float explosionAudioVolume = 1f;
+    [SerializeField] protected float explosionAudioMinDistance = 1f;
+    [SerializeField] protected float explosionAudioMaxDistance = 90f;
 
     [Header("AI")]
     [SerializeField] protected StateMachine aiStateMachine;
@@ -193,12 +199,14 @@ public class Enemy : MonoBehaviour, IDamageable
     protected SpriteRenderer healthBarBackgroundRenderer;
     protected SpriteRenderer healthBarFillRenderer;
     protected Coroutine carImpactRoutine;
+    bool restoreAgentAfterCarImpact;
 
     public float MaxHealth => maxHealth;
     public float CurrentHealth => currentHealth;
     public bool IsAlive => !isDead;
     public bool IsRamDamageImmune => isCapturedByGrapple || armed;
     public float Size => size;
+    public float MovementSpeedScale => GetMovementSpeedScale();
     public float Damage => damage;
     public bool CanBeGrappled => canBeGrappled;
     public bool ExplosionCanHarmPlayer => explosionCanHarmPlayer;
@@ -207,6 +215,7 @@ public class Enemy : MonoBehaviour, IDamageable
     public StateMachine StateMachine => aiStateMachine;
 
     protected bool IsArmed => armed;
+    protected float SizeScale => Mathf.Max(0.01f, size);
 
     public virtual void OnAttackWindup(float windupDuration, Transform target) { }
 
@@ -250,6 +259,9 @@ public class Enemy : MonoBehaviour, IDamageable
         currentHealth = Application.isPlaying ? Mathf.Clamp(currentHealth, 0f, maxHealth) : maxHealth;
         explosionRadius = Mathf.Max(0f, explosionRadius);
         explosionDamage = Mathf.Max(0f, explosionDamage);
+        explosionAudioVolume = Mathf.Clamp01(explosionAudioVolume);
+        explosionAudioMinDistance = Mathf.Max(0.01f, explosionAudioMinDistance);
+        explosionAudioMaxDistance = Mathf.Max(explosionAudioMinDistance, explosionAudioMaxDistance);
         carImpactPhysicsDuration = Mathf.Max(0.01f, carImpactPhysicsDuration);
         carImpactLift = Mathf.Max(0f, carImpactLift);
         carImpactLiftFromStrength = Mathf.Max(0f, carImpactLiftFromStrength);
@@ -269,13 +281,24 @@ public class Enemy : MonoBehaviour, IDamageable
         if (logDamageEvents)
             Debug.Log(name + " took " + amount + " damage. HP: " + currentHealth + "/" + maxHealth, this);
 
+        OnDamageTaken(amount, source);
+
         if (currentHealth <= 0f)
-            Die();
+        {
+            if (explodeOnDeath)
+                Explode();
+            else
+                Die();
+        }
         else
+        {
             RefreshHealthBar();
+        }
 
         return true;
     }
+
+    protected virtual void OnDamageTaken(float amount, GameObject source) { }
 
     protected virtual void LateUpdate()
     {
@@ -285,7 +308,7 @@ public class Enemy : MonoBehaviour, IDamageable
         if (mainCamera == null)
             mainCamera = Camera.main;
 
-        healthBarRoot.position = transform.position + healthBarOffset;
+        PositionHealthBar();
         if (mainCamera != null)
             healthBarRoot.forward = mainCamera.transform.forward;
     }
@@ -328,10 +351,21 @@ public class Enemy : MonoBehaviour, IDamageable
         if (direction.sqrMagnitude < 0.0001f)
             return;
 
+        bool shouldRestoreAgent = ShouldRestoreAgentAfterCarImpact();
         if (carImpactRoutine != null)
+        {
+            shouldRestoreAgent |= restoreAgentAfterCarImpact;
             StopCoroutine(carImpactRoutine);
+            carImpactRoutine = null;
+        }
 
+        restoreAgentAfterCarImpact = shouldRestoreAgent;
         carImpactRoutine = StartCoroutine(HandleCarImpact(direction.normalized, strength));
+    }
+
+    bool ShouldRestoreAgentAfterCarImpact()
+    {
+        return agent != null && agent.enabled && agent.isOnNavMesh;
     }
 
     protected virtual void Explode()
@@ -360,14 +394,31 @@ public class Enemy : MonoBehaviour, IDamageable
         }
 
         if (explosionVFX != null)
-            Instantiate(explosionVFX, pos, Quaternion.identity);
+            SpawnExplosionPrefab(pos);
 
         RuntimeParticleFactory.SpawnEnemyExplosionPulse(pos, explosionRadius);
 
         if (explosionSFX != null)
-            AudioPlaybackUtility.PlayDetachedClip(explosionSFX, pos, 1f, 1f, 1f, 1f, 24f);
+            AudioPlaybackUtility.PlayDetachedClip(
+                explosionSFX,
+                pos,
+                explosionAudioVolume,
+                1f,
+                1f,
+                explosionAudioMinDistance,
+                explosionAudioMaxDistance);
 
         Die(forceDestroy: true);
+    }
+
+    void SpawnExplosionPrefab(Vector3 position)
+    {
+        GameObject effect = Instantiate(explosionVFX, position, Quaternion.identity);
+        if (effect == null)
+            return;
+
+        float radiusScale = Mathf.Max(0.01f, explosionRadius / DefaultExplosionVisualRadius);
+        effect.transform.localScale *= radiusScale;
     }
 
     protected virtual void Die(bool forceDestroy = false)
@@ -398,6 +449,8 @@ public class Enemy : MonoBehaviour, IDamageable
             StopCoroutine(carImpactRoutine);
             carImpactRoutine = null;
         }
+
+        restoreAgentAfterCarImpact = false;
     }
 
     protected virtual IEnumerator HandleCarImpact(Vector3 direction, float strength)
@@ -406,7 +459,7 @@ public class Enemy : MonoBehaviour, IDamageable
             aiStateMachine.SetTransitionLock(true);
 
         Quaternion uprightRotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
-        bool canRestoreAgent = agent != null && agent.enabled && agent.isOnNavMesh;
+        bool canRestoreAgent = restoreAgentAfterCarImpact;
 
         OnCarImpactStarted();
 
@@ -437,9 +490,7 @@ public class Enemy : MonoBehaviour, IDamageable
 
         if (!isDead)
         {
-            Vector3 standPosition = transform.position;
-            if (NavMesh.SamplePosition(transform.position, out NavMeshHit navHit, carImpactNavMeshSampleRadius, NavMesh.AllAreas))
-                standPosition = navHit.position;
+            Vector3 standPosition = GetCarImpactStandPosition(transform.position);
 
             if (rb != null)
                 rb.position = standPosition;
@@ -454,10 +505,19 @@ public class Enemy : MonoBehaviour, IDamageable
             if (!agent.enabled)
                 agent.enabled = true;
 
-            agent.Warp(transform.position);
-            agent.ResetPath();
-            agent.velocity = Vector3.zero;
-            agent.isStopped = false;
+            Vector3 standPosition = GetCarImpactStandPosition(transform.position);
+            if (rb != null)
+                rb.position = standPosition;
+            else
+                transform.position = standPosition;
+
+            bool restoredAgent = agent.Warp(standPosition);
+            if (restoredAgent && agent.isOnNavMesh)
+            {
+                agent.ResetPath();
+                agent.velocity = Vector3.zero;
+                agent.isStopped = false;
+            }
         }
 
         if (rb != null)
@@ -467,9 +527,23 @@ public class Enemy : MonoBehaviour, IDamageable
             OnRecoveredFromCarImpact();
 
         if (aiStateMachine != null && !isDead && !armed && !isCapturedByGrapple)
+        {
             aiStateMachine.SetTransitionLock(false);
+            aiStateMachine.TryEnterChaseState();
+        }
 
+        restoreAgentAfterCarImpact = false;
         carImpactRoutine = null;
+    }
+
+    Vector3 GetCarImpactStandPosition(Vector3 position)
+    {
+        int areaMask = agent != null ? agent.areaMask : NavMesh.AllAreas;
+        float sampleRadius = Mathf.Max(carImpactNavMeshSampleRadius, agent != null ? agent.radius * 2f : 0f);
+        if (NavMesh.SamplePosition(position, out NavMeshHit navHit, sampleRadius, areaMask))
+            return navHit.position;
+
+        return position;
     }
 
     protected virtual void EnsureHealthBar()
@@ -483,7 +557,7 @@ public class Enemy : MonoBehaviour, IDamageable
         GameObject root = new GameObject("HealthBar");
         root.transform.SetParent(transform, false);
         healthBarRoot = root.transform;
-        healthBarRoot.localPosition = healthBarOffset;
+        PositionHealthBar();
 
         GameObject bg = new GameObject("Background");
         bg.transform.SetParent(healthBarRoot, false);
@@ -510,8 +584,8 @@ public class Enemy : MonoBehaviour, IDamageable
         if (healthBarRoot == null || healthBarFillTransform == null)
             return;
 
-        float width = healthBarSize.x;
-        float height = healthBarSize.y;
+        float width = healthBarSize.x * GetHealthBarWidthScale();
+        float height = healthBarSize.y * GetHealthBarHeightScale();
         float ratio = Mathf.Clamp01(currentHealth / Mathf.Max(1f, maxHealth));
 
         if (healthBarBackgroundRenderer != null)
@@ -521,6 +595,113 @@ public class Enemy : MonoBehaviour, IDamageable
         healthBarFillTransform.localScale = new Vector3(fillWidth, height * 0.78f, 1f);
         healthBarFillTransform.localPosition = new Vector3(-(width - fillWidth) * 0.5f, 0f, -0.001f);
         healthBarRoot.gameObject.SetActive(!isDead);
+    }
+
+    protected virtual void PositionHealthBar()
+    {
+        if (healthBarRoot == null)
+            return;
+
+        float horizontalScale = GetHealthBarWidthScale();
+        Vector3 position;
+        if (TryGetHealthBarAnchorBounds(out Bounds anchorBounds))
+        {
+            position = anchorBounds.center;
+            position.x += healthBarOffset.x * horizontalScale;
+            position.y = anchorBounds.max.y + GetHealthBarClearance() + Mathf.Max(0f, healthBarOffset.y - 2f);
+            position.z += healthBarOffset.z * horizontalScale;
+        }
+        else
+        {
+            Vector3 offset = healthBarOffset;
+            offset.x *= horizontalScale;
+            offset.y *= GetHealthBarOffsetScale();
+            offset.z *= horizontalScale;
+            position = transform.position + offset;
+        }
+
+        healthBarRoot.position = position;
+    }
+
+    float GetMovementSpeedScale()
+    {
+        float sizeBonus = Mathf.Max(0f, Mathf.Sqrt(SizeScale) - 1f);
+        return 1f + Mathf.Min(sizeBonus * 0.3f, 1f);
+    }
+
+    float GetHealthBarWidthScale()
+    {
+        float sizeBonus = Mathf.Max(0f, Mathf.Sqrt(SizeScale) - 1f);
+        return 1f + sizeBonus * 1.75f;
+    }
+
+    float GetHealthBarHeightScale()
+    {
+        float sizeBonus = Mathf.Max(0f, Mathf.Sqrt(SizeScale) - 1f);
+        return Mathf.Clamp(1f + sizeBonus * 0.08f, 1f, 1.3f);
+    }
+
+    float GetHealthBarClearance()
+    {
+        return Mathf.Max(0.25f, healthBarSize.y * GetHealthBarHeightScale() * 2f);
+    }
+
+    float GetHealthBarOffsetScale()
+    {
+        float sizeBonus = Mathf.Max(0f, Mathf.Sqrt(SizeScale) - 1f);
+        return 1f + sizeBonus * 0.55f;
+    }
+
+    bool TryGetHealthBarAnchorBounds(out Bounds bounds)
+    {
+        Renderer[] renderers = GetComponentsInChildren<Renderer>();
+        bool found = false;
+        bounds = default;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled || IsHealthBarChild(renderer.transform))
+                continue;
+
+            if (!found)
+            {
+                bounds = renderer.bounds;
+                found = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        if (found)
+            return true;
+
+        Collider[] colliders = GetComponentsInChildren<Collider>();
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider collider = colliders[i];
+            if (collider == null || !collider.enabled || collider.isTrigger || IsHealthBarChild(collider.transform))
+                continue;
+
+            if (!found)
+            {
+                bounds = collider.bounds;
+                found = true;
+            }
+            else
+            {
+                bounds.Encapsulate(collider.bounds);
+            }
+        }
+
+        return found;
+    }
+
+    bool IsHealthBarChild(Transform candidate)
+    {
+        return healthBarRoot != null && candidate != null && candidate.IsChildOf(healthBarRoot);
     }
 
     protected virtual void OnDrawGizmosSelected()

@@ -14,6 +14,8 @@ public class GrappleProjectile : MonoBehaviour
     Vector3 fireDirection;
     Vector3 startPosition;
     Rigidbody attachedEnemy;
+    Enemy attachedEnemyComponent;
+    ThrowableVase attachedThrowableVase;
     Collider projectileCollider;
     Collider[] carColliders;
     LayerMask enemyMask;
@@ -24,6 +26,8 @@ public class GrappleProjectile : MonoBehaviour
 
     public bool IsHoldingEnemy => state == State.HoldingEnemy;
     public Transform HeldEnemyTransform => attachedEnemy != null ? attachedEnemy.transform : null;
+    public Enemy HeldEnemyComponent => attachedEnemyComponent;
+    public ThrowableVase HeldThrowableVase => attachedThrowableVase;
 
     public void Initialize(GrappleController owner, Vector3 direction)
     {
@@ -98,6 +102,15 @@ public class GrappleProjectile : MonoBehaviour
 
     void HandleHit(Collider collider, Rigidbody hitRb)
     {
+        ThrowableVase throwableVase = ResolveThrowableVase(collider, hitRb);
+        if (throwableVase != null)
+        {
+            Rigidbody vaseBody = throwableVase.GetComponent<Rigidbody>();
+            if (vaseBody != null)
+                AttachEnemy(vaseBody, null, throwableVase);
+            return;
+        }
+
         Enemy enemy = ResolveEnemy(collider, hitRb);
         if (enemy == null)
             return;
@@ -106,7 +119,7 @@ public class GrappleProjectile : MonoBehaviour
         if (enemyBody == null)
             return;
 
-        AttachEnemy(enemyBody, enemy);
+        AttachEnemy(enemyBody, enemy, null);
     }
 
     void CheckRange()
@@ -127,7 +140,19 @@ public class GrappleProjectile : MonoBehaviour
         return collider != null ? collider.GetComponentInParent<Enemy>() : null;
     }
 
-    void AttachEnemy(Rigidbody enemy, Enemy enemyComponent)
+    ThrowableVase ResolveThrowableVase(Collider collider, Rigidbody hitRb)
+    {
+        if (hitRb != null)
+        {
+            ThrowableVase attachedThrowable = hitRb.GetComponent<ThrowableVase>();
+            if (attachedThrowable != null)
+                return attachedThrowable;
+        }
+
+        return collider != null ? collider.GetComponentInParent<ThrowableVase>() : null;
+    }
+
+    void AttachEnemy(Rigidbody enemy, Enemy enemyComponent, ThrowableVase throwableVase)
     {
         if (state != State.Flying) return;
 
@@ -140,7 +165,15 @@ public class GrappleProjectile : MonoBehaviour
             return;
         }
 
+        if (throwableVase != null && !throwableVase.CanBeGrappled)
+        {
+            BeginReturn();
+            return;
+        }
+
         attachedEnemy = enemy;
+        attachedEnemyComponent = enemyComponent;
+        attachedThrowableVase = throwableVase;
         heldEnemyColliders = attachedEnemy.GetComponentsInChildren<Collider>();
         IgnoreHeldEnemyCarCollisions(true);
 
@@ -157,7 +190,9 @@ public class GrappleProjectile : MonoBehaviour
 
         if (enemyComponent != null)
             enemyComponent.OnCapturedByGrapple();
-        if (controller != null)
+        if (throwableVase != null)
+            throwableVase.OnCapturedByGrapple();
+        if (controller != null && enemyComponent != null)
             controller.NotifyEnemyGrappled();
 
         rb.linearVelocity = Vector3.zero;
@@ -177,8 +212,21 @@ public class GrappleProjectile : MonoBehaviour
         IgnoreCollisionSet(releasedColliders, carColliders, true);
 
         attachedEnemy = null;
+        attachedEnemyComponent = null;
+        attachedThrowableVase = null;
         heldEnemyColliders = null;
         return released;
+    }
+
+    public static void DestroyAllActive()
+    {
+        GrappleProjectile[] projectiles = FindObjectsByType<GrappleProjectile>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < projectiles.Length; i++)
+        {
+            GrappleProjectile projectile = projectiles[i];
+            if (projectile != null)
+                projectile.DestroySelf();
+        }
     }
 
     void BeginReturn()
@@ -228,11 +276,29 @@ public class GrappleProjectile : MonoBehaviour
 
     public void DestroySelf()
     {
+        ReleaseEnemy();
+        if (controller != null)
+            controller.OnProjectileFinished();
+
+        if (projectileCollider != null)
+            projectileCollider.enabled = false;
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = true;
+        }
+
         Destroy(gameObject);
     }
 
     void OnDestroy()
     {
+        ReleaseEnemy();
+        if (controller != null)
+            controller.OnProjectileFinished();
+
         IgnoreProjectileCarCollisions(false);
     }
 

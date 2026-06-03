@@ -1,14 +1,53 @@
 <ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/HUDStyleSheet.uss?fileID=7433441132597879392&amp;guid=4d50dd9cdcbf42dc975df35f4e4f87f8&amp;type=3#HUDStyleSheet" />
     <ui:VisualElement name="hud-root" class="hud-root">
+        <ui:VisualElement name="arena-counter-container" class="arena-counter-container">
+            <ui:Label name="arena-counter-text" class="arena-counter-text" />
+        </ui:VisualElement>
         <ui:VisualElement name="tutorial-container" class="tutorial-container">
             <ui:Label name="tutorial-text" class="tutorial-text" />
         </ui:VisualElement>
-        <ui:VisualElement class="hud-panel">
-            <ui:VisualElement name="gauge-stack" class="gauge-stack">
-                <ui:VisualElement name="health-gauge" class="circular-gauge health-gauge" />
-                <ui:VisualElement name="speed-gauge" class="circular-gauge speed-gauge" />
-                <ui:VisualElement name="boost-gauge" class="circular-gauge boost-gauge" />
+        <ui:VisualElement name="hud-panel" class="hud-panel">
+            <ui:VisualElement name="hud-panel-image" class="hud-panel-image" />
+            <ui:VisualElement name="speedometer" class="speedometer">
+                <ui:VisualElement name="speedometer-background-image" class="speedometer-background-image" />
+                <ui:VisualElement class="speedometer-face">
+                    <ui:VisualElement class="speedometer-arc" />
+                    <ui:VisualElement class="speedometer-inner-shadow" />
+                </ui:VisualElement>
+                <ui:VisualElement name="speedometer-needle" class="speedometer-needle">
+                    <ui:VisualElement name="speedometer-needle-image" class="speedometer-needle-image" />
+                    <ui:VisualElement name="speedometer-needle-fallback" class="speedometer-needle-fallback" />
+                </ui:VisualElement>
+                <ui:VisualElement class="speedometer-hub" />
+                <ui:Label name="speed-value" text="0" class="speedometer-value" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-bars">
+                <ui:VisualElement class="hud-bar-row">
+                    <ui:VisualElement class="hud-bar-header">
+                        <ui:Label text="HEALTH" class="hud-bar-label" />
+                        <ui:Label name="health-value" text="100%" class="hud-bar-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="hud-bar-track health-bar-track">
+                        <ui:VisualElement name="health-fill" class="hud-bar-fill health-fill" />
+                        <ui:VisualElement name="health-bar-overlay-image" class="hud-bar-overlay-image" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="hud-bar-row">
+                    <ui:VisualElement class="hud-bar-header">
+                        <ui:Label text="BOOST" class="hud-bar-label" />
+                        <ui:Label name="boost-value" text="0/3" class="hud-bar-value boost-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="hud-bar-track boost-bar-track">
+                        <ui:VisualElement name="boost-layer-one" class="hud-bar-fill boost-layer boost-layer-one" />
+                        <ui:VisualElement name="boost-layer-two" class="hud-bar-fill boost-layer boost-layer-two" />
+                        <ui:VisualElement name="boost-layer-three" class="hud-bar-fill boost-layer boost-layer-three" />
+                        <ui:VisualElement name="boost-bar-overlay-image" class="hud-bar-overlay-image" />
+                        <ui:VisualElement name="boost-marker-one" class="boost-marker" />
+                        <ui:VisualElement name="boost-marker-two" class="boost-marker" />
+                        <ui:VisualElement name="boost-marker-three" class="boost-marker boost-marker-final" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

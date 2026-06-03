@@ -52,5 +52,14 @@ MonoBehaviour:
   minDistanceFromPlayer: 8
   maxSpawnAttempts: 20
   navMeshSampleDistance: 4
+  spawnClearancePadding: 0.2
+  fallbackSpawnClearanceRadius: 0.75
+  fallbackSpawnClearanceHeight: 2
+  spawnBlockerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
   playerTag: Player
   spawnedEnemyParent: {fileID: 0}
+  throwableVasePrefab: {fileID: 610000000000000001, guid: d8293d68089b4b0686cd7a638ce7391a, type: 3}
+  minThrowableVasesAtOnce: 4
+  maxThrowableVasesAtOnce: 5
